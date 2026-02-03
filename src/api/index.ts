@@ -1,20 +1,27 @@
 import { createRouter } from "better-call";
 import type { StorageContext } from "../types/context";
 import type { StorageOptions } from "../types/options";
-import { upload } from "./routes";
+import {
+	createDeleteRoute,
+	createDownloadRoute,
+	createUploadRoute,
+} from "./routes-v2";
 import { toStorageEndpoints } from "./to-storage-endpoints";
 
-export function getEndpoints<C extends StorageContext<StorageOptions>>(
-	context: C,
+export function getEndpoints<O extends StorageOptions>(
+	context: StorageContext<O>,
+	options: O,
 ) {
 	const endpoints = {
-		upload,
+		upload: createUploadRoute(options),
+		delete: createDeleteRoute(options),
+		download: createDownloadRoute(options),
 	} as const;
 
-	const api = toStorageEndpoints(endpoints, context);
+	const api = toStorageEndpoints<O, typeof endpoints>(endpoints, context);
 
 	return {
-		api: api as typeof endpoints,
+		api,
 	};
 }
 
@@ -22,7 +29,7 @@ export function router<O extends StorageOptions>(
 	options: O,
 	context: StorageContext<O>,
 ) {
-	const { api } = getEndpoints(context);
+	const { api } = getEndpoints(context, options);
 
-	return createRouter(api, {});
+	return createRouter(api as any, {});
 }

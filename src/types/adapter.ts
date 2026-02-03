@@ -27,4 +27,17 @@ export type Adapter = {
 			metadata: Record<string, string>;
 		}>,
 	): string | Promise<string>;
+
+	/**
+	 * Generate a presigned download url for a given key.
+	 *
+	 * @param key - The key to generate a presigned download url for.
+	 * @param options - The options for the presigned download url.
+	 */
+	generatePresignedDownloadUrl(
+		key: string,
+		options?: Partial<{
+			expiresIn: number;
+		}>,
+	): string | Promise<string>;
 };

@@ -19,5 +19,10 @@ export function createAwsS3Adapter(
 
 			return `${JSON.stringify({ fileInfo, key, acl, contentType, expiresIn, metadata })}`;
 		},
+		generatePresignedDownloadUrl(key, options) {
+			const { expiresIn = 3600 } = options ?? {};
+
+			return `${JSON.stringify({ key, expiresIn, action: "download" })}`;
+		},
 	};
 }

@@ -6,7 +6,7 @@ import type { Storage } from "../types/storage";
 export function createStorage<O extends StorageOptions>(options: O) {
 	const context = createContext(options);
 
-	const { api } = getEndpoints(context);
+	const { api } = getEndpoints(context, options);
 
 	const { handler } = router(options, context);
 

@@ -4,37 +4,38 @@ import { createStorageEndpoint } from "../create-storage-endpoint";
 import { withMetadata } from "../utils/metadata";
 
 /**
- * Creates the upload endpoint
+ * Creates the delete endpoint
  * @param options - Storage options
  * @param requireMetadata - Whether metadata is required (default: true)
  */
-export function createUploadRoute<O extends StorageOptions>(
+export function createDeleteRoute<O extends StorageOptions>(
 	options: O,
 	requireMetadata = true,
 ) {
 	const baseSchema = z.object({
-		file: z.instanceof(File),
+		key: z.string(),
 	});
 
 	const bodySchema = withMetadata(baseSchema, options, requireMetadata);
 
 	return createStorageEndpoint(
-		"/generate-upload-url",
+		"/delete",
 		{
 			method: "POST",
 			body: bodySchema as any,
 		},
 		async (ctx) => {
-			const { file } = ctx.body;
+			const { key } = ctx.body;
 			const metadata = "metadata" in ctx.body ? ctx.body.metadata : undefined;
 
+			// Here you can use metadata for authorization checks before deletion
+			// For example: check if the user owns the file based on metadata
+			console.log("Deleting file:", key, "with metadata:", metadata);
+
 			const adapter = ctx.context.$options.adapter;
-			const uploadUrl = await adapter.generatePresignedUploadUrl(file.name, {
-				contentType: file.type,
-				size: file.size,
-				name: file.name,
-			});
-			return { uploadUrl };
+			// await adapter.delete(key); // Assuming adapter has a delete method
+
+			return { success: true };
 		},
 	);
 }

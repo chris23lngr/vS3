@@ -5,6 +5,8 @@ import type {
 } from "better-call";
 import { runWithEndpointContext } from "../context/endpoint-context";
 import type { StorageContext } from "../types/context";
+import type { StorageOptions } from "../types/options";
+import type { StorageAPI } from "../types/api";
 import type { StorageEndpoint } from "./create-storage-endpoint";
 
 type InternalContext = Partial<
@@ -23,11 +25,12 @@ type UserInputContext = Partial<
 >;
 
 export function toStorageEndpoints<
+	O extends StorageOptions,
 	const E extends Record<
 		string,
 		Omit<StorageEndpoint<string, EndpointOptions, any>, "wrap">
 	>,
->(endpoints: E, ctx: StorageContext | Promise<StorageContext>): E {
+>(endpoints: E, ctx: StorageContext<O> | Promise<StorageContext<O>>): StorageAPI<O> {
 	const api: Record<
 		string,
 		((
@@ -57,5 +60,5 @@ export function toStorageEndpoints<
 		api[key].path = endpoint.path;
 		api[key].options = endpoint.options;
 	}
-	return api as unknown as E;
+	return api as unknown as StorageAPI<O>;
 }
