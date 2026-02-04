@@ -1,11 +1,8 @@
 import { createRouter } from "better-call";
+import z, { uppercase } from "zod";
 import type { StorageContext } from "../types/context";
 import type { StorageOptions } from "../types/options";
-import {
-	createDeleteRoute,
-	createDownloadRoute,
-	createUploadRoute,
-} from "./routes";
+import { createUploadRoute } from "./routes";
 import { toStorageEndpoints } from "./to-storage-endpoints";
 
 export function getEndpoints<O extends StorageOptions>(
@@ -13,14 +10,8 @@ export function getEndpoints<O extends StorageOptions>(
 	options: O,
 ) {
 	const endpoints = {
-		upload: createUploadRoute(options),
-		delete: createDeleteRoute(options),
-		download: createDownloadRoute(options),
+		upload: createUploadRoute(options.metadataSchema),
 	} as const;
-
-	endpoints.delete({
-		
-	})
 
 	const api = toStorageEndpoints<O, typeof endpoints>(endpoints, context);
 

@@ -5,6 +5,7 @@ import {
 	type StrictEndpoint,
 } from "better-call";
 import z from "zod";
+import { runWithEndpointContext } from "../context/endpoint-context";
 import type { StandardSchemaV1 } from "../types/standard-schema";
 
 type EndpointHandler<
@@ -42,10 +43,11 @@ type ExtendedOptions<
 	body: ExtendSchemaWithMetadata<Options["body"], M>;
 };
 
-type StorageEndpointOptions<M extends StandardSchemaV1> = EndpointOptions & {
-	outputSchema?: StandardSchemaV1;
-	metadataSchema: M;
-};
+export type StorageEndpointOptions<M extends StandardSchemaV1> =
+	EndpointOptions & {
+		outputSchema?: StandardSchemaV1;
+		metadataSchema: M;
+	};
 
 export function createStorageEndpoint<
 	Path extends string,
@@ -77,6 +79,13 @@ export function createStorageEndpoint<
 			...endpointOptions,
 			body: bodySchema,
 		} as unknown as ExtendedOptions<Options, M>,
-		handler,
+		async (ctx) => runWithEndpointContext(ctx as any, () => handler(ctx)),
 	) as unknown as StrictEndpoint<Path, ExtendedOptions<Options, M>, any>;
 }
+
+export type StorageEndpoint<
+	Path extends string,
+	M extends StandardSchemaV1,
+	Opts extends StorageEndpointOptions<M>,
+	R,
+> = ReturnType<typeof createStorageEndpoint<Path, M, Opts, R>>;
