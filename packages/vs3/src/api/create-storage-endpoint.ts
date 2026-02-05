@@ -67,12 +67,19 @@ export function createStorageEndpoint<
 	handler: EndpointHandler<Path, ExtendedOptions<Options, M>, Response>,
 ): StrictEndpoint<Path, ExtendedOptions<Options, M>, Response> {
 	const { metadataSchema, ...endpointOptions } = options;
+	const isUndefinedMetadata =
+		metadataSchema instanceof z.ZodUndefined ||
+		metadataSchema instanceof z.ZodNever;
 
 	const bodySchema = endpointOptions.body
-		? mergeSchema(endpointOptions.body as z.ZodObject<any>, metadataSchema)
-		: z.object({
-				metadata: standardSchemaToZod(metadataSchema),
-			});
+		? isUndefinedMetadata
+			? (endpointOptions.body as z.ZodObject<any>)
+			: mergeSchema(endpointOptions.body as z.ZodObject<any>, metadataSchema)
+		: isUndefinedMetadata
+			? z.object({})
+			: z.object({
+					metadata: standardSchemaToZod(metadataSchema),
+				});
 
 	return createEndpoint(
 		path,

@@ -45,14 +45,17 @@ describe("generateObjectKey", () => {
 	});
 
 	it("throws INVALID_FILE_INFO when no extension exists", () => {
-		expect(() =>
+		try {
 			generateObjectKey({
 				name: "no-extension",
 				size: 1,
 				contentType: "text/plain",
-			}),
-		).toMatchObject({
-			code: StorageErrorCode.INVALID_FILE_INFO,
-		});
+			});
+			expect.fail("Expected generateObjectKey to throw");
+		} catch (error) {
+			expect(error).toMatchObject({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+			});
+		}
 	});
 });
