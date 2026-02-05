@@ -1,21 +1,17 @@
 import { createRouter } from "better-call";
 import type { StorageContext } from "../types/context";
 import type { StorageOptions } from "../types/options";
-import {
-	createDeleteRoute,
-	createDownloadRoute,
-	createUploadRoute,
-} from "./routes";
+import { createUploadUrlRoute } from "./routes/upload-url";
 import { toStorageEndpoints } from "./to-storage-endpoints";
 
 export function getEndpoints<O extends StorageOptions>(
 	context: StorageContext<O>,
 	options: O,
 ) {
+	type MetadataSchema = O extends StorageOptions<infer M> ? M : never;
+
 	const endpoints = {
-		upload: createUploadRoute(options),
-		delete: createDeleteRoute(options),
-		download: createDownloadRoute(options),
+		uploadUrl: createUploadUrlRoute(options.metadataSchema as MetadataSchema),
 	} as const;
 
 	const api = toStorageEndpoints<O, typeof endpoints>(endpoints, context);
@@ -31,5 +27,9 @@ export function router<O extends StorageOptions>(
 ) {
 	const { api } = getEndpoints(context, options);
 
-	return createRouter(api as any, {});
+	return createRouter(api as any, {
+		routerContext: {
+			options,
+		},
+	});
 }
