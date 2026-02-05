@@ -22,7 +22,7 @@ export class StorageError extends Error {
 
 	constructor(error: z.infer<typeof errorSchema>) {
 		super(error.message);
-		this.name = "sdfsdf";
+		this.name = "StorageError";
 		this.code = error.code;
 		this.details = error.details;
 	}

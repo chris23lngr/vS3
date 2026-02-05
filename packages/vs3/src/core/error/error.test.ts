@@ -1,0 +1,173 @@
+import { describe, expect, it } from "vitest";
+import { StorageError, StorageClientError, StorageServerError } from "./error";
+import { StorageErrorCode } from "./codes";
+
+describe("StorageError", () => {
+	it("creates error with correct name", () => {
+		const error = new StorageError({
+			origin: "server",
+			message: "Test error",
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: undefined,
+		});
+
+		expect(error.name).toBe("StorageError");
+	});
+
+	it("creates error with correct message", () => {
+		const error = new StorageError({
+			origin: "server",
+			message: "Test error message",
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: undefined,
+		});
+
+		expect(error.message).toBe("Test error message");
+	});
+
+	it("creates error with correct code", () => {
+		const error = new StorageError({
+			origin: "server",
+			message: "Test error",
+			code: StorageErrorCode.NETWORK_ERROR,
+			details: undefined,
+		});
+
+		expect(error.code).toBe(StorageErrorCode.NETWORK_ERROR);
+	});
+
+	it("creates error with correct details", () => {
+		const details = { reason: "Connection timeout" };
+		const error = new StorageError({
+			origin: "server",
+			message: "Network error",
+			code: StorageErrorCode.NETWORK_ERROR,
+			details,
+		});
+
+		expect(error.details).toEqual(details);
+	});
+
+	it("is an instance of Error", () => {
+		const error = new StorageError({
+			origin: "server",
+			message: "Test error",
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: undefined,
+		});
+
+		expect(error).toBeInstanceOf(Error);
+	});
+
+	it("is an instance of StorageError", () => {
+		const error = new StorageError({
+			origin: "server",
+			message: "Test error",
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: undefined,
+		});
+
+		expect(error).toBeInstanceOf(StorageError);
+	});
+
+	it("handles all error codes", () => {
+		for (const code of Object.values(StorageErrorCode)) {
+			const error = new StorageError({
+				origin: "server",
+				message: `Test ${code}`,
+				code,
+				details: undefined,
+			});
+
+			expect(error.code).toBe(code);
+		}
+	});
+});
+
+describe("StorageClientError", () => {
+	it("creates client error with correct name", () => {
+		const error = new StorageClientError({
+			message: "Client error",
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			details: undefined,
+		});
+
+		expect(error.name).toBe("StorageError");
+	});
+
+	it("creates client error with correct properties", () => {
+		const error = new StorageClientError({
+			message: "Invalid file",
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			details: { field: "size" },
+		});
+
+		expect(error.message).toBe("Invalid file");
+		expect(error.code).toBe(StorageErrorCode.INVALID_FILE_INFO);
+		expect(error.details).toEqual({ field: "size" });
+	});
+
+	it("is an instance of StorageError", () => {
+		const error = new StorageClientError({
+			message: "Client error",
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			details: undefined,
+		});
+
+		expect(error).toBeInstanceOf(StorageError);
+	});
+
+	it("is an instance of StorageClientError", () => {
+		const error = new StorageClientError({
+			message: "Client error",
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			details: undefined,
+		});
+
+		expect(error).toBeInstanceOf(StorageClientError);
+	});
+});
+
+describe("StorageServerError", () => {
+	it("creates server error with correct name", () => {
+		const error = new StorageServerError({
+			message: "Server error",
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			details: undefined,
+		});
+
+		expect(error.name).toBe("StorageError");
+	});
+
+	it("creates server error with correct properties", () => {
+		const error = new StorageServerError({
+			message: "Internal error",
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			details: { stackTrace: "..." },
+		});
+
+		expect(error.message).toBe("Internal error");
+		expect(error.code).toBe(StorageErrorCode.INTERNAL_SERVER_ERROR);
+		expect(error.details).toEqual({ stackTrace: "..." });
+	});
+
+	it("is an instance of StorageError", () => {
+		const error = new StorageServerError({
+			message: "Server error",
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			details: undefined,
+		});
+
+		expect(error).toBeInstanceOf(StorageError);
+	});
+
+	it("is an instance of StorageServerError", () => {
+		const error = new StorageServerError({
+			message: "Server error",
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			details: undefined,
+		});
+
+		expect(error).toBeInstanceOf(StorageServerError);
+	});
+});
