@@ -9,13 +9,9 @@
 			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
 		},
-		"./client": {
-			"types": "./dist/client/index.d.ts",
-			"default": "./dist/client/index.js"
-		},
 		"./react": {
-			"types": "./dist/client-v2/react/index.d.ts",
-			"default": "./dist/client-v2/react/index.js"
+			"types": "./dist/client/react/index.d.ts",
+			"default": "./dist/client/react/index.js"
 		},
 		"./integrations/next-js": {
 			"types": "./dist/integrations/next-js/index.d.ts",
