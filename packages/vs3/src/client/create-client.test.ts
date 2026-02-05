@@ -67,6 +67,19 @@ describe("createBaseClient", () => {
 
 			const result = await client.uploadFile(mockFile, { userId: "user-1" });
 
+			expect(mockFetchFn).toHaveBeenCalledWith("/upload-url", {
+				body: {
+					fileInfo: {
+						contentType: "text/plain",
+						name: "test.txt",
+						size: mockFile.size,
+					},
+					metadata: {
+						userId: "user-1",
+					},
+				},
+			});
+
 			// Verify xhrUpload was called and awaited
 			expect(xhrUploadSpy).toHaveBeenCalledWith(
 				"https://s3.example.com/upload",
@@ -122,6 +135,35 @@ describe("createBaseClient", () => {
 				code: StorageErrorCode.NETWORK_ERROR,
 				message: "Network failure",
 			});
+		});
+
+		it("surfaces API errors from upload-url request", async () => {
+			const metadataSchema = z.object({ userId: z.string() });
+			const { createFetch } = await import("@better-fetch/fetch");
+			const mockFetchFn = vi.fn().mockResolvedValue({
+				error: { status: 400, message: "Bad Request" },
+				data: null,
+			});
+			(createFetch as ReturnType<typeof vi.fn>).mockReturnValue(mockFetchFn);
+
+			const client = createBaseClient({
+				baseURL: mockBaseURL,
+				apiPath: mockApiPath,
+				metadataSchema,
+			});
+
+			const mockFile = new File(["test content"], "test.txt", {
+				type: "text/plain",
+			});
+			const xhrUploadSpy = vi.spyOn(xhrUploadModule, "xhrUpload");
+
+			await expect(
+				client.uploadFile(mockFile, { userId: "user-1" }),
+			).rejects.toMatchObject({
+				code: StorageErrorCode.UNKNOWN_ERROR,
+				message: "Bad Request",
+			});
+			expect(xhrUploadSpy).not.toHaveBeenCalled();
 		});
 
 		it("calls onSuccess after upload completes", async () => {
