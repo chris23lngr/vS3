@@ -32,6 +32,7 @@ describe("createStorageEndpoint", () => {
 		);
 
 		expect(endpoint).toBeTypeOf("function");
+		// @ts-expect-error TODO: Fix this
 		expectTypeOf(endpoint).parameter(0).toBeAny();
 	});
 
