@@ -76,9 +76,9 @@ export function createStorageEndpoint<
 
 	const bodySchema = endpointOptions.body
 		? isUndefinedMetadata
-			? (endpointOptions.body as z.ZodObject<any>)
+			? (endpointOptions.body as z.ZodObject<z.ZodRawShape>)
 			: mergeSchema(
-					endpointOptions.body as z.ZodObject<any>,
+					endpointOptions.body as z.ZodObject<z.ZodRawShape>,
 					metadataSchema,
 					isMetadataRequired,
 				)

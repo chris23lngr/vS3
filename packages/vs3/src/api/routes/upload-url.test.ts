@@ -327,6 +327,9 @@ describe("upload-url route", () => {
 		).rejects.toMatchObject({
 			name: "APIError",
 			statusCode: 400,
+			body: {
+				code: "VALIDATION_ERROR",
+			},
 		});
 	});
 
@@ -351,10 +354,13 @@ describe("upload-url route", () => {
 		).rejects.toMatchObject({
 			name: "APIError",
 			statusCode: 400,
+			body: {
+				code: "VALIDATION_ERROR",
+			},
 		});
 	});
 
-	it("allows empty metadata object when metadata schema is provided but requireMetadata is false", async () => {
+	it("allows empty metadata object when all metadata fields are optional", async () => {
 		const metadataSchema = z.object({
 			userId: z.string().optional(),
 		});
@@ -362,9 +368,8 @@ describe("upload-url route", () => {
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const contextOptions = createContextOptions(metadataSchema);
 
-		// This test assumes requireMetadata can be overridden or is not enforced
-		// Since the registry has requireMetadata: true, this test verifies
-		// that validation still runs for provided metadata
+		// Metadata is required by the registry, but since all fields in the schema
+		// are optional, an empty object {} is valid and should pass validation
 		await expect(
 			callEndpoint(endpoint, {
 				body: {
