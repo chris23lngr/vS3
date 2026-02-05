@@ -34,19 +34,18 @@ export function createBaseClient<
 			options?: Partial<ClientFnOptions>,
 		) => {
 			try {
-				const response = await $fetch("/generate-upload-url", {
+				const response = await $fetch("/test", {
 					body: {
-						file: {
+						fileInfo: {
 							contentType: file.type,
 							name: file.name,
-							size: file.size,
+							size: file.size ?? 0,
 						},
 						metadata,
 					},
 				});
 			} catch (error) {
 				if (error instanceof StorageError) {
-
 					options?.onError?.(error);
 				}
 
@@ -55,3 +54,24 @@ export function createBaseClient<
 		},
 	};
 }
+
+const client = createBaseClient({
+	metadataSchema: z.object({
+		userId: z.string(),
+	}),
+});
+
+client.$fetch("/test", {
+	body: {
+		fileInfo: {
+			name: "test.txt",
+			size: 100,
+			contentType: "text/plain",
+		},
+		metadata: {},
+	},
+});
+
+client.uploadFile(new File([], "test.txt"), {
+	userId: "234",
+});

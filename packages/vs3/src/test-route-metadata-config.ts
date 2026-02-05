@@ -23,7 +23,7 @@ const storage = createStorage({
 
 storage.api.upload({
 	body: {
-		file: {
+		fileInfo: {
 			contentType: "text/plain",
 			name: "test.txt",
 			size: 100,

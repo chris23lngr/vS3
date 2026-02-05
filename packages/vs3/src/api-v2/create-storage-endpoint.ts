@@ -17,7 +17,7 @@ type EndpointHandler<
 > = (context: EndpointContext<Path, Options, StorageContext>) => Promise<R>;
 
 // Utility type to extend a StandardSchema with a metadata field
-type ExtendSchemaWithMetadata<
+export type ExtendSchemaWithMetadata<
 	BodySchema extends StandardSchemaV1 | undefined,
 	MetadataSchema extends StandardSchemaV1,
 > = BodySchema extends StandardSchemaV1

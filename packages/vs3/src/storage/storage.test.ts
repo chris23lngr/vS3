@@ -39,7 +39,7 @@ describe("storage", () => {
 
 		const result = await storage.api.upload({
 			body: {
-				file: {
+				fileInfo: {
 					name: "test.txt",
 					size: 100,
 					contentType: "text/plain",
