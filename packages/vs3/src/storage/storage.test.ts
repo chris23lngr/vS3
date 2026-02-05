@@ -52,9 +52,7 @@ describe("storage", () => {
 			userId: z.string(),
 		});
 
-		const generateKey = vi
-			.fn()
-			.mockResolvedValue("uploads/user-1/photo.png");
+		const generateKey = vi.fn().mockResolvedValue("uploads/user-1/photo.png");
 
 		const storage = createStorage({
 			bucket: "test",

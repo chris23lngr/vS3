@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import z from "zod";
-import type { Adapter } from "../types/adapter";
 import { createContext } from "../context/create-context";
+import type { Adapter } from "../types/adapter";
 import { router } from "./router";
 
 const createAdapter = (): Adapter => ({

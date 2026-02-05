@@ -68,18 +68,35 @@ export function createBaseClient<
 
 				const { key, presignedUrl } = response.data;
 
-				xhrUpload(presignedUrl, file, {
+				const uploadResult = await xhrUpload(presignedUrl, file, {
 					onProgress,
 				});
 
+				const result = {
+					key,
+					presignedUrl,
+					uploadUrl: uploadResult.uploadUrl,
+					status: uploadResult.status,
+					statusText: uploadResult.statusText,
+				};
+
 				onSuccess?.({ key, presignedUrl });
-				return { key, presignedUrl };
+				return result;
 			} catch (error) {
 				if (error instanceof StorageError) {
 					onError?.(error);
+					throw error;
 				}
 
-				throw error;
+				const storageError = new StorageClientError({
+					code: StorageErrorCode.NETWORK_ERROR,
+					message:
+						error instanceof Error ? error.message : "Upload failed unexpectedly",
+					details: error instanceof Error ? error.stack : String(error),
+				});
+
+				onError?.(storageError);
+				throw storageError;
 			}
 		},
 	};

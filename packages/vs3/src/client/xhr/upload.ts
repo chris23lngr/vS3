@@ -42,6 +42,12 @@ type XhrUploadOptions = {
 	onProgress?: (progress: number) => void;
 };
 
+export type XhrUploadResult = {
+	uploadUrl: string;
+	status: number;
+	statusText: string;
+};
+
 /**
  * Uploads a file from the client to a given URL using XMLHttpRequest.
  */
@@ -49,7 +55,7 @@ export async function xhrUpload(
 	url: string,
 	file: File,
 	options?: XhrUploadOptions,
-) {
+): Promise<XhrUploadResult> {
 	const { retry, headers = {}, onProgress, signal } = options ?? {};
 
 	let maxAttempts = 1;
@@ -114,4 +120,7 @@ export async function xhrUpload(
 			throw error;
 		}
 	}
+
+	// This should never be reached, but TypeScript requires a return
+	throw new Error("Upload failed: max attempts reached");
 }
