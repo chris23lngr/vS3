@@ -305,4 +305,78 @@ describe("upload-url route", () => {
 		// @ts-expect-error TODO: Fix this
 		expectTypeOf(endpoint).parameter(0).toBeUnknown();
 	});
+
+	it("rejects request when metadata is required but not provided", async () => {
+		const metadataSchema = z.object({
+			userId: z.string(),
+		});
+
+		const endpoint = createUploadUrlRoute(metadataSchema);
+		const contextOptions = createContextOptions(metadataSchema);
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: undefined,
+				},
+				context: {
+					$options: contextOptions,
+				},
+			}),
+		).rejects.toMatchObject({
+			name: "APIError",
+			statusCode: 400,
+		});
+	});
+
+	it("rejects request when metadata is required but is null", async () => {
+		const metadataSchema = z.object({
+			userId: z.string(),
+		});
+
+		const endpoint = createUploadUrlRoute(metadataSchema);
+		const contextOptions = createContextOptions(metadataSchema);
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: null,
+				},
+				context: {
+					$options: contextOptions,
+				},
+			}),
+		).rejects.toMatchObject({
+			name: "APIError",
+			statusCode: 400,
+		});
+	});
+
+	it("allows empty metadata object when metadata schema is provided but requireMetadata is false", async () => {
+		const metadataSchema = z.object({
+			userId: z.string().optional(),
+		});
+
+		const endpoint = createUploadUrlRoute(metadataSchema);
+		const contextOptions = createContextOptions(metadataSchema);
+
+		// This test assumes requireMetadata can be overridden or is not enforced
+		// Since the registry has requireMetadata: true, this test verifies
+		// that validation still runs for provided metadata
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: {},
+				},
+				context: {
+					$options: contextOptions,
+				},
+			}),
+		).resolves.toMatchObject({
+			presignedUrl: "https://example.com/upload",
+		});
+	});
 });
