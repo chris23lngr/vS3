@@ -23,8 +23,18 @@ const MAGIC_BYTE_LENGTH = 12;
 const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F]/;
 const MIME_PATTERN = /^[a-z0-9.+-]+\/[a-z0-9.+*-]+$/i;
 
+/**
+ * Extension aliases map for normalization.
+ * Keys are alternative extensions, values are the canonical extension.
+ * This ensures "jpeg" and "jpg" are treated as equivalent.
+ */
+const EXTENSION_ALIASES: Record<string, string> = {
+	jpeg: "jpg",
+};
+
 function normalizeExtension(extension: string): string {
-	return extension.replace(/^\./, "").toLowerCase();
+	const lower = extension.replace(/^\./, "").toLowerCase();
+	return EXTENSION_ALIASES[lower] ?? lower;
 }
 
 function getFileExtension(fileName: string): string {
