@@ -15,7 +15,7 @@ export type StorageMiddlewareContext<C = object> = {
 /**
  * Middleware handler function.
  * Returns a context object to merge into the accumulated context,
- * or void if the middleware does not contribute context.
+ * or undefined if the middleware does not contribute context.
  */
 export type MiddlewareHandler<TContext = object, TResult = object> = (
 	ctx: StorageMiddlewareContext<TContext>,

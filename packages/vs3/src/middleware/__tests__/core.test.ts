@@ -48,6 +48,15 @@ describe("createStorageMiddleware", () => {
 
 		expect(middleware.config.includePaths).toEqual(["/api"]);
 	});
+
+	it("throws when both skipPaths and includePaths are provided", () => {
+		expect(() =>
+			createStorageMiddleware(
+				{ name: "invalid", skipPaths: ["/a"], includePaths: ["/b"] },
+				async () => undefined,
+			),
+		).toThrow("skipPaths and includePaths are mutually exclusive");
+	});
 });
 
 describe("executeMiddlewareChain", () => {
