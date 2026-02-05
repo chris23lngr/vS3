@@ -308,14 +308,14 @@ describe("filename-sanitizer", () => {
 				expect(result.sanitized).toBe("a_b_c.txt");
 			});
 
-			it("removes leading replacement characters", () => {
+			it("preserves leading replacement characters", () => {
 				const result = sanitizeFilename("/file.txt");
-				expect(result.sanitized).toBe("file.txt");
+				expect(result.sanitized).toBe("_file.txt");
 			});
 
-			it("removes trailing replacement characters", () => {
+			it("preserves trailing replacement characters", () => {
 				const result = sanitizeFilename("file/");
-				expect(result.sanitized).toBe("file");
+				expect(result.sanitized).toBe("file_");
 			});
 
 			it("handles empty replacement character", () => {

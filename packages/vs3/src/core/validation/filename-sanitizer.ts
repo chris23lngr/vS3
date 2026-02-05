@@ -247,13 +247,7 @@ function applyWhitespaceAndReplacements(
 	if (trimmed !== value) {
 		applied.push("trimmed_whitespace");
 	}
-	let current = collapseReplacementChars(trimmed, replacementChar);
-	if (replacementChar) {
-		const escaped = replacementChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-		const leadingTrailingRegex = new RegExp(`^${escaped}+|${escaped}+$`, "g");
-		current = current.replace(leadingTrailingRegex, "");
-	}
-	return current;
+	return collapseReplacementChars(trimmed, replacementChar);
 }
 
 function applySanitizationSteps(
