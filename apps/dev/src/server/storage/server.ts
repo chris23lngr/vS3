@@ -1,5 +1,6 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import { aws, createStorage } from "vs3";
+import z from "zod";
 import { env } from "@/env";
 
 /**
@@ -40,4 +41,10 @@ export const storage = createStorage({
 	adapter: aws({
 		client: getS3Client(),
 	}),
+	metadataSchema: z.object({
+		userId: z.string(),
+		orgId: z.string().optional(),
+	}),
 });
+
+export const MetadataSchema = storage.$Infer.metadata;

@@ -1,16 +1,19 @@
 "use client";
 
-import { useUpload } from "vs3/client/react";
 import { storageClient } from "@/server/storage/client";
 
 export function StorageClientDemo() {
-	const { upload, status, progress, error, data, reset } =
-		useUpload(storageClient);
+	const { upload, state, reset } = storageClient.useUpload();
 
 	return (
 		<div>
 			<input
-				onChange={(e) => e.target.files?.[0] && upload({ file: e.target.files[0] })}
+				onChange={(e) =>
+					e.target.files?.[0] &&
+					upload(e.target.files[0], {
+						userId: "sdf",
+					})
+				}
 				type="file"
 			/>
 
@@ -18,10 +21,7 @@ export function StorageClientDemo() {
 				<pre>
 					{JSON.stringify(
 						{
-							status,
-							progress,
-							error,
-							data,
+							state,
 						},
 						null,
 						2,

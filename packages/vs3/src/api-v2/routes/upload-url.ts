@@ -20,6 +20,8 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 			outputSchema: schemas.output,
 		},
 		async (ctx) => {
+			console.log("Request received", ctx);
+
 			if (ctx.context.$options === undefined) {
 				throw new StorageServerError({
 					code: StorageErrorCode.INTERNAL_SERVER_ERROR,

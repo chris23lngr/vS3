@@ -21,20 +21,6 @@ const storage = createStorage({
 	}),
 });
 
-storage.api.upload({
-	body: {
-		fileInfo: {
-			contentType: "text/plain",
-			name: "test.txt",
-			size: 100,
-		},
-		metadata: {
-			userId: "sdf",
-			orgId: "sdf",
-		},
-	},
-});
-
 storage.api.uploadUrl({
 	body: {
 		fileInfo: {

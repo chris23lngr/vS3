@@ -33,7 +33,7 @@ export function createUseUpload<M extends StandardSchemaV1>(
 		}, []);
 
 		const upload = useCallback(
-			async (file: File, metadata: M) => {
+			async (file: File, metadata: StandardSchemaV1.InferInput<M>) => {
 				try {
 					resetState();
 
