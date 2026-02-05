@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { getCurrentStorageContext } from "../context/endpoint-context";
 import type { StorageContext } from "../types/context";
 import type { StorageOptions } from "../types/options";
-import { getCurrentStorageContext } from "../context/endpoint-context";
 import { toStorageEndpoints } from "./to-storage-endpoints";
 
 type TestEndpoint = ((ctx: any) => Promise<any>) & {
@@ -74,7 +74,10 @@ describe("toStorageEndpoints", () => {
 			options: { method: "POST" as const },
 		});
 
-		const api = toStorageEndpoints({ uploadUrl: endpoint }, createStorageContext());
+		const api = toStorageEndpoints(
+			{ uploadUrl: endpoint },
+			createStorageContext(),
+		);
 
 		expect(api.uploadUrl.path).toBe("/upload-url");
 		expect(api.uploadUrl.options).toEqual({ method: "POST" });

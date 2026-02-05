@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { StorageError, StorageClientError, StorageServerError } from "./error";
 import { StorageErrorCode } from "./codes";
+import { StorageClientError, StorageError, StorageServerError } from "./error";
 
 describe("StorageError", () => {
 	it("creates error with correct name", () => {
