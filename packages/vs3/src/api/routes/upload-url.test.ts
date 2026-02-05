@@ -21,17 +21,19 @@ const createAdapter = (): Adapter => ({
 	deleteObject: vi.fn(),
 });
 
-type ContextOverrides = {
+type ContextOverrides<M extends StandardSchemaV1> = {
 	generateKey?: (
 		fileInfo: typeof baseFileInfo,
-		metadata: any,
+		metadata: StandardSchemaV1.InferOutput<M>,
 	) => string | Promise<string>;
 	allowedFileTypes?: string[];
+	contentValidators?: StorageOptions<M>["contentValidators"];
+	contentValidatorTimeoutMs?: number;
 };
 
 const createContextOptions = <M extends StandardSchemaV1>(
 	metadataSchema: M,
-	overrides: ContextOverrides = {},
+	overrides: ContextOverrides<M> = {},
 ): StorageOptions<M> => ({
 	bucket: "test-bucket",
 	adapter: createAdapter(),
@@ -745,6 +747,45 @@ describe("upload-url route", () => {
 					fileSize: 10000000,
 					maxFileSize: 5000000,
 					fileName: "large-video.mp4",
+				},
+			});
+		});
+	});
+
+	describe("content validation", () => {
+		it("rejects request when a content validator fails", async () => {
+			const metadataSchema = z.object({
+				userId: z.string(),
+			});
+
+			const endpoint = createUploadUrlRoute(metadataSchema);
+			const contentValidator = vi.fn().mockResolvedValue({
+				valid: false,
+				reason: "blocked by policy",
+			});
+			const contextOptions = createContextOptions(metadataSchema, {
+				contentValidators: [contentValidator],
+			});
+
+			await expect(
+				callEndpoint(endpoint, {
+					body: {
+						fileInfo: baseFileInfo,
+						metadata: {
+							userId: "user-1",
+						},
+					},
+					context: {
+						$options: contextOptions,
+					},
+				}),
+			).rejects.toMatchObject({
+				code: StorageErrorCode.CONTENT_VALIDATION_ERROR,
+				message: "Content validation failed: blocked by policy",
+				details: {
+					validatorIndex: 0,
+					reason: "blocked by policy",
+					fileName: baseFileInfo.name,
 				},
 			});
 		});

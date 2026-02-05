@@ -43,16 +43,21 @@ function throwIfIssue(issue: FileValidationIssue | null): void {
 	}
 }
 
+type RunCustomValidatorsOptions<TMetadata> = {
+	fileInfo: FileInfo;
+	metadata: TMetadata;
+	validators: ContentValidatorInput<TMetadata>[] | undefined;
+	timeoutMs: number | undefined;
+};
+
 /**
  * Runs custom content validators if configured.
  * @throws {StorageServerError} If any validator fails
  */
 async function runCustomValidators<TMetadata>(
-	fileInfo: FileInfo,
-	metadata: TMetadata,
-	validators: ContentValidatorInput<TMetadata>[] | undefined,
-	timeoutMs: number | undefined,
+	options: RunCustomValidatorsOptions<TMetadata>,
 ): Promise<void> {
+	const { fileInfo, metadata, validators, timeoutMs } = options;
 	if (!validators || validators.length === 0) {
 		return;
 	}
@@ -181,12 +186,12 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 			const internalMetadata = await parseMetadata(metadataSchema, ctx.body.metadata);
 
 			// Run custom content validators after built-in validations
-			await runCustomValidators(
+			await runCustomValidators({
 				fileInfo,
-				internalMetadata,
-				contentValidators,
-				contentValidatorTimeoutMs,
-			);
+				metadata: internalMetadata,
+				validators: contentValidators,
+				timeoutMs: contentValidatorTimeoutMs,
+			});
 
 			const key = generateKey
 				? await generateKey(fileInfo, internalMetadata)
