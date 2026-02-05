@@ -3,6 +3,12 @@ import { generateObjectKey } from "../../adapters/utils";
 import { StorageErrorCode } from "../../core/error/codes";
 import { StorageServerError } from "../../core/error/error";
 import { formatFileSize } from "../../core/utils/format-file-size";
+import {
+	getFileNameValidationIssue,
+	getFileTypeValidationIssue,
+	getObjectKeyValidationIssue,
+	type FileValidationIssue,
+} from "../../core/validation/file-validator";
 import type { FileInfo } from "../../types/file";
 import type { StandardSchemaV1 } from "../../types/standard-schema";
 import { createStorageEndpoint } from "../create-storage-endpoint";
@@ -26,6 +32,12 @@ function validateFileSize(
 				fileName: fileInfo.name,
 			},
 		});
+	}
+}
+
+function throwIfIssue(issue: FileValidationIssue | null): void {
+	if (issue) {
+		throw new StorageServerError(issue);
 	}
 }
 
@@ -108,13 +120,24 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 			const { adapter, metadataSchema, generateKey, maxFileSize } = ctx.context.$options;
 			const { fileInfo, acl, expiresIn } = ctx.body;
 
+			throwIfIssue(getFileNameValidationIssue(fileInfo.name));
+
 			validateFileSize(fileInfo, maxFileSize);
+
+			throwIfIssue(
+				getFileTypeValidationIssue({
+					fileInfo,
+					allowedFileTypes: ctx.context.$options.allowedFileTypes,
+				}),
+			);
 
 			const internalMetadata = await parseMetadata(metadataSchema, ctx.body.metadata);
 
 			const key = generateKey
 				? await generateKey(fileInfo, internalMetadata)
 				: generateObjectKey(fileInfo);
+
+			throwIfIssue(getObjectKeyValidationIssue(key));
 
 			const url = await adapter.generatePresignedUploadUrl(key, fileInfo, {
 				expiresIn,

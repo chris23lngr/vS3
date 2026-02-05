@@ -21,17 +21,22 @@ const createAdapter = (): Adapter => ({
 	deleteObject: vi.fn(),
 });
 
-const createContextOptions = <M extends StandardSchemaV1>(
-	metadataSchema: M,
+type ContextOverrides = {
 	generateKey?: (
 		fileInfo: typeof baseFileInfo,
 		metadata: any,
-	) => string | Promise<string>,
+	) => string | Promise<string>;
+	allowedFileTypes?: string[];
+};
+
+const createContextOptions = <M extends StandardSchemaV1>(
+	metadataSchema: M,
+	overrides: ContextOverrides = {},
 ): StorageOptions<M> => ({
 	bucket: "test-bucket",
 	adapter: createAdapter(),
 	metadataSchema,
-	generateKey,
+	...overrides,
 });
 
 const callEndpoint = <T extends (input?: any) => any>(
@@ -47,7 +52,7 @@ describe("upload-url route", () => {
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const generateKey = vi.fn().mockResolvedValue("uploads/abc.png");
-		const contextOptions = createContextOptions(metadataSchema, generateKey);
+		const contextOptions = createContextOptions(metadataSchema, { generateKey });
 
 		const result = await callEndpoint(endpoint, {
 			body: {
@@ -78,7 +83,7 @@ describe("upload-url route", () => {
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const generateKey = vi.fn().mockResolvedValue("uploads/xyz.png");
-		const contextOptions = createContextOptions(metadataSchema, generateKey);
+		const contextOptions = createContextOptions(metadataSchema, { generateKey });
 		const adapter = contextOptions.adapter;
 
 		await callEndpoint(endpoint, {
@@ -118,7 +123,7 @@ describe("upload-url route", () => {
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const generateKey = vi.fn().mockResolvedValue("uploads/parsed.png");
-		const contextOptions = createContextOptions(metadataSchema, generateKey);
+		const contextOptions = createContextOptions(metadataSchema, { generateKey });
 
 		await callEndpoint(endpoint, {
 			body: {
@@ -412,6 +417,161 @@ describe("upload-url route", () => {
 			}),
 		).resolves.toMatchObject({
 			presignedUrl: "https://example.com/upload",
+		});
+	});
+
+	describe("file type validation", () => {
+		it("accepts file when MIME type is allowed", async () => {
+			const metadataSchema = z.object({
+				userId: z.string(),
+			});
+
+			const endpoint = createUploadUrlRoute(metadataSchema);
+			const contextOptions = createContextOptions(metadataSchema, {
+				allowedFileTypes: ["image/png"],
+			});
+
+			await expect(
+				callEndpoint(endpoint, {
+					body: {
+						fileInfo: baseFileInfo,
+						metadata: {
+							userId: "user-1",
+						},
+					},
+					context: {
+						$options: contextOptions,
+					},
+				}),
+			).resolves.toMatchObject({
+				presignedUrl: "https://example.com/upload",
+			});
+		});
+
+		it("rejects file when MIME type is not allowed", async () => {
+			const metadataSchema = z.object({
+				userId: z.string(),
+			});
+
+			const endpoint = createUploadUrlRoute(metadataSchema);
+			const contextOptions = createContextOptions(metadataSchema, {
+				allowedFileTypes: ["image/png"],
+			});
+
+			const fileInfo = {
+				...baseFileInfo,
+				contentType: "image/jpeg",
+			};
+
+			await expect(
+				callEndpoint(endpoint, {
+					body: {
+						fileInfo,
+						metadata: {
+							userId: "user-1",
+						},
+					},
+					context: {
+						$options: contextOptions,
+					},
+				}),
+			).rejects.toMatchObject({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+				message: "File type is not allowed.",
+			});
+		});
+
+		it("rejects file when extension is not allowed", async () => {
+			const metadataSchema = z.object({
+				userId: z.string(),
+			});
+
+			const endpoint = createUploadUrlRoute(metadataSchema);
+			const contextOptions = createContextOptions(metadataSchema, {
+				allowedFileTypes: [".png"],
+			});
+
+			const fileInfo = {
+				...baseFileInfo,
+				name: "photo.jpg",
+				contentType: "image/jpeg",
+			};
+
+			await expect(
+				callEndpoint(endpoint, {
+					body: {
+						fileInfo,
+						metadata: {
+							userId: "user-1",
+						},
+					},
+					context: {
+						$options: contextOptions,
+					},
+				}),
+			).rejects.toMatchObject({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+				message: "File extension is not allowed.",
+			});
+		});
+
+		it("rejects invalid file names", async () => {
+			const metadataSchema = z.object({
+				userId: z.string(),
+			});
+
+			const endpoint = createUploadUrlRoute(metadataSchema);
+			const contextOptions = createContextOptions(metadataSchema);
+
+			const fileInfo = {
+				...baseFileInfo,
+				name: "../private.png",
+			};
+
+			await expect(
+				callEndpoint(endpoint, {
+					body: {
+						fileInfo,
+						metadata: {
+							userId: "user-1",
+						},
+					},
+					context: {
+						$options: contextOptions,
+					},
+				}),
+			).rejects.toMatchObject({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+				message: "Invalid file name.",
+			});
+		});
+
+		it("rejects invalid generated keys", async () => {
+			const metadataSchema = z.object({
+				userId: z.string(),
+			});
+
+			const endpoint = createUploadUrlRoute(metadataSchema);
+			const contextOptions = createContextOptions(metadataSchema, {
+				generateKey: vi.fn().mockResolvedValue("../secret.png"),
+			});
+
+			await expect(
+				callEndpoint(endpoint, {
+					body: {
+						fileInfo: baseFileInfo,
+						metadata: {
+							userId: "user-1",
+						},
+					},
+					context: {
+						$options: contextOptions,
+					},
+				}),
+			).rejects.toMatchObject({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+				message: "Invalid object key.",
+			});
 		});
 	});
 

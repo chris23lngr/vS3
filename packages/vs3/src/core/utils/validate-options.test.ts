@@ -113,4 +113,71 @@ describe("validateStorageOptions", () => {
 			);
 		});
 	});
+
+	describe("allowedFileTypes validation", () => {
+		it("accepts valid MIME types and extensions", () => {
+			expect(() =>
+				validateStorageOptions({
+					bucket: "test",
+					adapter: {} as any,
+					allowedFileTypes: ["image/png", ".jpg", "image/*"],
+				}),
+			).not.toThrow();
+		});
+
+		it("accepts undefined allowedFileTypes", () => {
+			expect(() =>
+				validateStorageOptions({
+					bucket: "test",
+					adapter: {} as any,
+					allowedFileTypes: undefined,
+				}),
+			).not.toThrow();
+		});
+
+		it("rejects empty allowedFileTypes", () => {
+			expect(() =>
+				validateStorageOptions({
+					bucket: "test",
+					adapter: {} as any,
+					allowedFileTypes: [],
+				}),
+			).toThrow(
+				expect.objectContaining({
+					code: StorageErrorCode.INVALID_FILE_INFO,
+					message: "Invalid allowedFileTypes configuration.",
+				}),
+			);
+		});
+
+		it("rejects invalid MIME patterns", () => {
+			expect(() =>
+				validateStorageOptions({
+					bucket: "test",
+					adapter: {} as any,
+					allowedFileTypes: ["image/"],
+				}),
+			).toThrow(
+				expect.objectContaining({
+					code: StorageErrorCode.INVALID_FILE_INFO,
+					message: "Invalid allowedFileTypes configuration.",
+				}),
+			);
+		});
+
+		it("rejects invalid extensions", () => {
+			expect(() =>
+				validateStorageOptions({
+					bucket: "test",
+					adapter: {} as any,
+					allowedFileTypes: [".tar.gz"],
+				}),
+			).toThrow(
+				expect.objectContaining({
+					code: StorageErrorCode.INVALID_FILE_INFO,
+					message: "Invalid allowedFileTypes configuration.",
+				}),
+			);
+		});
+	});
 });
