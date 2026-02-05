@@ -6,6 +6,7 @@ import type {
 	VerifyRequestInput,
 	VerifyRequestResult,
 	NonceStore,
+	VerificationFailureReason,
 } from "../../types/security";
 
 /** Default timestamp tolerance: 5 minutes */
@@ -42,23 +43,25 @@ function stringToBytes(str: string): Uint8Array {
 	return new TextEncoder().encode(str);
 }
 
+type CanonicalInput = {
+	method: string;
+	path: string;
+	timestamp: number;
+	nonce?: string;
+	bodyHash: string;
+};
+
 /**
  * Creates the canonical string to sign from request components.
  * Format: METHOD\nPATH\nTIMESTAMP\nNONCE\nBODY_HASH
  */
-function createCanonicalString(
-	method: string,
-	path: string,
-	timestamp: number,
-	nonce: string | undefined,
-	bodyHash: string,
-): string {
+function createCanonicalString(input: CanonicalInput): string {
 	const parts = [
-		method.toUpperCase(),
-		path,
-		timestamp.toString(),
-		nonce ?? "",
-		bodyHash,
+		input.method.toUpperCase(),
+		input.path,
+		input.timestamp.toString(),
+		input.nonce ?? "",
+		input.bodyHash,
 	];
 	return parts.join("\n");
 }
@@ -150,6 +153,129 @@ function constantTimeEqual(a: string, b: string): boolean {
  * });
  * ```
  */
+type SignerConfig = {
+	config: RequestSigningConfig;
+	algorithm: string;
+};
+
+type VerifyContext = {
+	input: VerifyRequestInput;
+	nonceStore?: NonceStore;
+	timestampTolerance: number;
+	nonceTtl: number;
+	requireNonce: boolean;
+	algorithm: string;
+	secret: string;
+};
+
+function resolveAlgorithm(config: RequestSigningConfig): string {
+	const algorithm = ALGORITHM_MAP[config.algorithm ?? DEFAULT_ALGORITHM];
+	if (!algorithm) {
+		throw new Error(`Unsupported algorithm: ${config.algorithm}`);
+	}
+	return algorithm;
+}
+
+async function signRequest(
+	input: SignRequestInput,
+	context: SignerConfig,
+): Promise<SignRequestResult> {
+	const timestamp = input.timestamp ?? Date.now();
+	const bodyHash = await computeHash(input.body ?? "", context.algorithm);
+	const canonicalString = createCanonicalString({
+		method: input.method,
+		path: input.path,
+		timestamp,
+		nonce: input.nonce,
+		bodyHash,
+	});
+	const signature = await computeHmac(context.config.secret, canonicalString, context.algorithm);
+	const headers: SignatureHeaders = {
+		"x-signature": signature,
+		"x-timestamp": timestamp.toString(),
+	};
+
+	if (input.nonce) {
+		headers["x-nonce"] = input.nonce;
+	}
+
+	return {
+		signature,
+		timestamp,
+		nonce: input.nonce,
+		headers,
+	};
+}
+
+function validateTimestamp(
+	timestamp: number,
+	toleranceMs: number,
+): VerificationFailureReason | null {
+	if (!Number.isFinite(timestamp)) {
+		return "timestamp_invalid";
+	}
+
+	const now = Date.now();
+	const age = Math.abs(now - timestamp);
+	if (age > toleranceMs) {
+		return "timestamp_expired";
+	}
+
+	return null;
+}
+
+async function validateNonce(
+	context: VerifyContext,
+): Promise<VerificationFailureReason | null> {
+	if (context.requireNonce && !context.input.nonce) {
+		return "nonce_missing";
+	}
+
+	if (!context.input.nonce || !context.nonceStore) {
+		return null;
+	}
+
+	const isUnique = await context.nonceStore.addIfNotExists(
+		context.input.nonce,
+		context.nonceTtl,
+	);
+	return isUnique ? null : "nonce_reused";
+}
+
+async function computeExpectedSignature(context: VerifyContext): Promise<string> {
+	const bodyHash = await computeHash(context.input.body ?? "", context.algorithm);
+	const canonicalString = createCanonicalString({
+		method: context.input.method,
+		path: context.input.path,
+		timestamp: context.input.timestamp,
+		nonce: context.input.nonce,
+		bodyHash,
+	});
+	return computeHmac(context.secret, canonicalString, context.algorithm);
+}
+
+async function verifyRequest(context: VerifyContext): Promise<VerifyRequestResult> {
+	const timestampFailure = validateTimestamp(
+		context.input.timestamp,
+		context.timestampTolerance,
+	);
+	if (timestampFailure) {
+		return { valid: false, reason: timestampFailure };
+	}
+
+	const nonceFailure = await validateNonce(context);
+	if (nonceFailure) {
+		return { valid: false, reason: nonceFailure };
+	}
+
+	const expectedSignature = await computeExpectedSignature(context);
+	if (!constantTimeEqual(context.input.signature, expectedSignature)) {
+		return { valid: false, reason: "signature_mismatch" };
+	}
+
+	return { valid: true };
+}
+
 export function createRequestSigner(config: RequestSigningConfig): {
 	sign: (input: SignRequestInput) => Promise<SignRequestResult>;
 	verify: (
@@ -157,107 +283,27 @@ export function createRequestSigner(config: RequestSigningConfig): {
 		nonceStore?: NonceStore,
 	) => Promise<VerifyRequestResult>;
 } {
-	const algorithm = ALGORITHM_MAP[config.algorithm ?? DEFAULT_ALGORITHM];
-	if (!algorithm) {
-		throw new Error(`Unsupported algorithm: ${config.algorithm}`);
-	}
-
+	const algorithm = resolveAlgorithm(config);
 	const timestampTolerance = config.timestampToleranceMs ?? DEFAULT_TIMESTAMP_TOLERANCE_MS;
 	const nonceTtl = config.nonceTtlMs ?? DEFAULT_NONCE_TTL_MS;
 	const requireNonce = config.requireNonce ?? false;
 
 	return {
-		/**
-		 * Signs a request and returns the signature with headers.
-		 */
-		sign: async (input: SignRequestInput): Promise<SignRequestResult> => {
-			const timestamp = input.timestamp ?? Date.now();
-			const bodyHash = await computeHash(input.body ?? "", algorithm);
-
-			const canonicalString = createCanonicalString(
-				input.method,
-				input.path,
-				timestamp,
-				input.nonce,
-				bodyHash,
-			);
-
-			const signature = await computeHmac(config.secret, canonicalString, algorithm);
-
-			const headers: SignatureHeaders = {
-				"x-signature": signature,
-				"x-timestamp": timestamp.toString(),
-			};
-
-			if (input.nonce) {
-				headers["x-nonce"] = input.nonce;
-			}
-
-			return {
-				signature,
-				timestamp,
-				nonce: input.nonce,
-				headers,
-			};
-		},
-
-		/**
-		 * Verifies a request signature.
-		 */
+		sign: async (input: SignRequestInput): Promise<SignRequestResult> =>
+			signRequest(input, { config, algorithm }),
 		verify: async (
 			input: VerifyRequestInput,
 			nonceStore?: NonceStore,
-		): Promise<VerifyRequestResult> => {
-			// Validate timestamp
-			if (!Number.isFinite(input.timestamp)) {
-				return { valid: false, reason: "timestamp_invalid" };
-			}
-
-			const now = Date.now();
-			const age = Math.abs(now - input.timestamp);
-
-			if (age > timestampTolerance) {
-				return { valid: false, reason: "timestamp_expired" };
-			}
-
-			// Validate nonce if required
-			if (requireNonce) {
-				if (!input.nonce) {
-					return { valid: false, reason: "nonce_missing" };
-				}
-
-				if (nonceStore) {
-					const isUnique = await nonceStore.addIfNotExists(input.nonce, nonceTtl);
-					if (!isUnique) {
-						return { valid: false, reason: "nonce_reused" };
-					}
-				}
-			} else if (input.nonce && nonceStore) {
-				// Optional nonce provided, still check for reuse
-				const isUnique = await nonceStore.addIfNotExists(input.nonce, nonceTtl);
-				if (!isUnique) {
-					return { valid: false, reason: "nonce_reused" };
-				}
-			}
-
-			// Compute expected signature
-			const bodyHash = await computeHash(input.body ?? "", algorithm);
-			const canonicalString = createCanonicalString(
-				input.method,
-				input.path,
-				input.timestamp,
-				input.nonce,
-				bodyHash,
-			);
-			const expectedSignature = await computeHmac(config.secret, canonicalString, algorithm);
-
-			// Compare signatures using constant-time comparison
-			if (!constantTimeEqual(input.signature, expectedSignature)) {
-				return { valid: false, reason: "signature_mismatch" };
-			}
-
-			return { valid: true };
-		},
+		): Promise<VerifyRequestResult> =>
+			verifyRequest({
+				input,
+				nonceStore,
+				timestampTolerance,
+				nonceTtl,
+				requireNonce,
+				algorithm,
+				secret: config.secret,
+			}),
 	};
 }
 

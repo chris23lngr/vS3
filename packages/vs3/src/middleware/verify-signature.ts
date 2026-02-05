@@ -1,11 +1,16 @@
 import { StorageErrorCode } from "../core/error/codes";
 import { StorageServerError } from "../core/error/error";
-import { createRequestSigner } from "../core/security/request-signer";
+import {
+	createInMemoryNonceStore,
+	createRequestSigner,
+} from "../core/security/request-signer";
 import type {
 	AuthHook,
 	AuthHookResult,
 	NonceStore,
 	RequestSigningConfig,
+	SignatureHeaders,
+	VerificationFailureReason,
 } from "../types/security";
 
 /**
@@ -35,6 +40,59 @@ export type VerifySignatureMiddlewareConfig = RequestSigningConfig & {
 	 * If not provided, a StorageServerError will be thrown.
 	 */
 	onVerificationFailure?: (reason: string, request: Request) => Response | never;
+};
+
+type VerificationFailureContext = {
+	reason: string;
+	code: StorageErrorCode;
+	message: string;
+	details?: unknown;
+	request: Request;
+	onVerificationFailure?: (reason: string, request: Request) => Response | never;
+};
+
+type HeaderValidationContext = {
+	request: Request;
+	config: VerifySignatureMiddlewareConfig;
+};
+
+type SignatureData = {
+	signature: string;
+	timestamp: number;
+	nonce?: string;
+};
+
+type VerificationContext = {
+	request: Request;
+	config: VerifySignatureMiddlewareConfig;
+	signer: ReturnType<typeof createRequestSigner>;
+	nonceStore?: NonceStore;
+};
+
+const VERIFICATION_ERROR_MAP: Record<
+	VerificationFailureReason,
+	{ code: StorageErrorCode; message: string }
+> = {
+	signature_mismatch: {
+		code: StorageErrorCode.SIGNATURE_INVALID,
+		message: "Request signature verification failed. The signature does not match.",
+	},
+	timestamp_expired: {
+		code: StorageErrorCode.TIMESTAMP_EXPIRED,
+		message: "Request timestamp has expired. The request is too old or from the future.",
+	},
+	timestamp_invalid: {
+		code: StorageErrorCode.TIMESTAMP_MISSING,
+		message: "Request timestamp is invalid.",
+	},
+	nonce_missing: {
+		code: StorageErrorCode.NONCE_MISSING,
+		message: "Request nonce is required but missing.",
+	},
+	nonce_reused: {
+		code: StorageErrorCode.NONCE_REUSED,
+		message: "Request nonce has already been used. Each request must have a unique nonce.",
+	},
 };
 
 /**
@@ -84,6 +142,220 @@ function createVerificationError(
 	});
 }
 
+function throwVerificationFailure(context: VerificationFailureContext): never {
+	const fallback = createVerificationError(context.code, context.message, context.details);
+	if (!context.onVerificationFailure) {
+		throw fallback;
+	}
+
+	const response = context.onVerificationFailure(context.reason, context.request);
+	if (response instanceof Response) {
+		throw response;
+	}
+
+	throw fallback;
+}
+
+function parseTimestamp(timestampStr: string): number | null {
+	if (!/^\d+$/.test(timestampStr)) {
+		return null;
+	}
+
+	const value = Number(timestampStr);
+	return Number.isFinite(value) ? value : null;
+}
+
+function headersToRecord(headers: SignatureHeaders): Record<string, string> {
+	const record: Record<string, string> = {
+		"x-signature": headers["x-signature"],
+		"x-timestamp": headers["x-timestamp"],
+	};
+	if (headers["x-nonce"]) {
+		record["x-nonce"] = headers["x-nonce"];
+	}
+	return record;
+}
+
+function getRequiredHeader(name: string, context: HeaderValidationContext): string {
+	const value = getHeader(context.request.headers, name);
+	if (value) {
+		return value;
+	}
+
+	const reason = name === "x-signature" ? "signature_missing" : "timestamp_missing";
+	const code =
+		name === "x-signature"
+			? StorageErrorCode.SIGNATURE_MISSING
+			: StorageErrorCode.TIMESTAMP_MISSING;
+	const message =
+		name === "x-signature"
+			? "Request signature is missing. Include the 'x-signature' header."
+			: "Request timestamp is missing. Include the 'x-timestamp' header.";
+	throwVerificationFailure({
+		reason,
+		code,
+		message,
+		details: { header: name },
+		request: context.request,
+		onVerificationFailure: context.config.onVerificationFailure,
+	});
+}
+
+function parseTimestampHeader(context: HeaderValidationContext): number {
+	const timestampStr = getRequiredHeader("x-timestamp", context);
+	const timestamp = parseTimestamp(timestampStr);
+	if (timestamp !== null) {
+		return timestamp;
+	}
+
+	throwVerificationFailure({
+		reason: "timestamp_invalid",
+		code: StorageErrorCode.TIMESTAMP_MISSING,
+		message: "Request timestamp is invalid. Must be a valid Unix timestamp in milliseconds.",
+		details: { header: "x-timestamp", value: timestampStr },
+		request: context.request,
+		onVerificationFailure: context.config.onVerificationFailure,
+	});
+}
+
+function validateNonceRequirement(context: HeaderValidationContext, nonce?: string): void {
+	if (!context.config.requireNonce || nonce) {
+		return;
+	}
+
+	throwVerificationFailure({
+		reason: "nonce_missing",
+		code: StorageErrorCode.NONCE_MISSING,
+		message: "Request nonce is missing. Include the 'x-nonce' header.",
+		details: { header: "x-nonce" },
+		request: context.request,
+		onVerificationFailure: context.config.onVerificationFailure,
+	});
+}
+
+function extractSignatureData(context: HeaderValidationContext): SignatureData {
+	const signature = getRequiredHeader("x-signature", context);
+	const timestamp = parseTimestampHeader(context);
+	const nonce = getHeader(context.request.headers, "x-nonce");
+	validateNonceRequirement(context, nonce);
+	return { signature, timestamp, nonce };
+}
+
+function handleVerificationFailure(
+	reason: VerificationFailureReason,
+	context: VerificationFailureContext,
+): never {
+	const errorInfo = VERIFICATION_ERROR_MAP[reason];
+	if (errorInfo) {
+		throwVerificationFailure({
+			...context,
+			reason,
+			code: errorInfo.code,
+			message: errorInfo.message,
+			details: { reason },
+		});
+	}
+
+	throwVerificationFailure({
+		...context,
+		reason,
+		code: StorageErrorCode.SIGNATURE_INVALID,
+		message: "Request signature verification failed.",
+		details: { reason },
+	});
+}
+
+async function runAuthHook(
+	request: Request,
+	authHook?: AuthHook,
+	onVerificationFailure?: (reason: string, request: Request) => Response | never,
+): Promise<AuthHookResult | undefined> {
+	if (!authHook) {
+		return undefined;
+	}
+
+	const headers: Record<string, string | undefined> = {};
+	request.headers.forEach((value, key) => {
+		headers[key] = value;
+	});
+
+	const authResult = await authHook({ request, headers });
+	if (authResult.authenticated) {
+		return authResult;
+	}
+
+	throwVerificationFailure({
+		reason: "auth_failed",
+		code: StorageErrorCode.UNAUTHORIZED,
+		message: authResult.reason ?? "Authentication failed.",
+		details: { authHookFailed: true },
+		request,
+		onVerificationFailure,
+	});
+}
+
+async function verifySignature(context: VerificationContext): Promise<SignatureData> {
+	const path = extractPath(context.request);
+	const headerContext: HeaderValidationContext = {
+		request: context.request,
+		config: context.config,
+	};
+	const signatureData = extractSignatureData(headerContext);
+	const body = await readRequestBody(context.request);
+	const verificationResult = await context.signer.verify(
+		{
+			method: context.request.method,
+			path,
+			body,
+			signature: signatureData.signature,
+			timestamp: signatureData.timestamp,
+			nonce: signatureData.nonce,
+		},
+		context.nonceStore,
+	);
+
+	if (!verificationResult.valid) {
+		handleVerificationFailure(verificationResult.reason, {
+			reason: verificationResult.reason,
+			code: StorageErrorCode.SIGNATURE_INVALID,
+			message: "Request signature verification failed.",
+			request: context.request,
+			onVerificationFailure: context.config.onVerificationFailure,
+		});
+	}
+
+	return signatureData;
+}
+
+type VerificationResponseInput = {
+	signatureData: SignatureData;
+	authResult?: AuthHookResult;
+};
+
+function buildVerificationResult(input: VerificationResponseInput): VerificationResult {
+	return {
+		verified: true,
+		timestamp: input.signatureData.timestamp,
+		nonce: input.signatureData.nonce,
+		auth: input.authResult?.authenticated
+			? {
+					userId: input.authResult.userId,
+					metadata: input.authResult.metadata,
+				}
+			: undefined,
+	};
+}
+
+async function verifySignedRequest(context: VerificationContext): Promise<VerificationResult> {
+	const signatureData = await verifySignature(context);
+	const authResult = await runAuthHook(
+		context.request,
+		context.config.authHook,
+		context.config.onVerificationFailure,
+	);
+	return buildVerificationResult({ signatureData, authResult });
+}
+
 /**
  * Result of verification containing extracted auth info.
  */
@@ -119,144 +391,24 @@ export function createVerifySignatureMiddleware(
 	config: VerifySignatureMiddlewareConfig,
 ): (request: Request) => Promise<VerificationResult> {
 	const signer = createRequestSigner(config);
+	const nonceStore =
+		config.requireNonce && !config.nonceStore
+			? createInMemoryNonceStore()
+			: config.nonceStore;
 	const skipPaths = new Set(config.skipPaths ?? []);
 
 	return async (request: Request): Promise<VerificationResult> => {
 		const path = extractPath(request);
-
-		// Skip verification for configured paths
 		if (skipPaths.has(path)) {
-			return {
-				verified: true,
-				timestamp: Date.now(),
-			};
+			return { verified: true, timestamp: Date.now() };
 		}
 
-		// Extract signature headers
-		const signature = getHeader(request.headers, "x-signature");
-		const timestampStr = getHeader(request.headers, "x-timestamp");
-		const nonce = getHeader(request.headers, "x-nonce");
-
-		// Validate signature presence
-		if (!signature) {
-			throw createVerificationError(
-				StorageErrorCode.SIGNATURE_MISSING,
-				"Request signature is missing. Include the 'x-signature' header.",
-				{ header: "x-signature" },
-			);
-		}
-
-		// Validate timestamp presence
-		if (!timestampStr) {
-			throw createVerificationError(
-				StorageErrorCode.TIMESTAMP_MISSING,
-				"Request timestamp is missing. Include the 'x-timestamp' header.",
-				{ header: "x-timestamp" },
-			);
-		}
-
-		const timestamp = Number.parseInt(timestampStr, 10);
-		if (!Number.isFinite(timestamp)) {
-			throw createVerificationError(
-				StorageErrorCode.TIMESTAMP_MISSING,
-				"Request timestamp is invalid. Must be a valid Unix timestamp in milliseconds.",
-				{ header: "x-timestamp", value: timestampStr },
-			);
-		}
-
-		// Validate nonce presence if required
-		if (config.requireNonce && !nonce) {
-			throw createVerificationError(
-				StorageErrorCode.NONCE_MISSING,
-				"Request nonce is missing. Include the 'x-nonce' header.",
-				{ header: "x-nonce" },
-			);
-		}
-
-		// Read request body
-		const body = await readRequestBody(request);
-
-		// Verify signature
-		const verificationResult = await signer.verify(
-			{
-				method: request.method,
-				path,
-				body,
-				signature,
-				timestamp,
-				nonce,
-			},
-			config.nonceStore,
-		);
-
-		if (!verificationResult.valid) {
-			const errorMap: Record<string, { code: StorageErrorCode; message: string }> = {
-				signature_mismatch: {
-					code: StorageErrorCode.SIGNATURE_INVALID,
-					message: "Request signature verification failed. The signature does not match.",
-				},
-				timestamp_expired: {
-					code: StorageErrorCode.TIMESTAMP_EXPIRED,
-					message: "Request timestamp has expired. The request is too old or from the future.",
-				},
-				timestamp_invalid: {
-					code: StorageErrorCode.TIMESTAMP_MISSING,
-					message: "Request timestamp is invalid.",
-				},
-				nonce_missing: {
-					code: StorageErrorCode.NONCE_MISSING,
-					message: "Request nonce is required but missing.",
-				},
-				nonce_reused: {
-					code: StorageErrorCode.NONCE_REUSED,
-					message: "Request nonce has already been used. Each request must have a unique nonce.",
-				},
-			};
-
-			const errorInfo = errorMap[verificationResult.reason];
-			if (errorInfo) {
-				throw createVerificationError(errorInfo.code, errorInfo.message, {
-					reason: verificationResult.reason,
-				});
-			}
-
-			throw createVerificationError(
-				StorageErrorCode.SIGNATURE_INVALID,
-				"Request signature verification failed.",
-				{ reason: verificationResult.reason },
-			);
-		}
-
-		// Run optional auth hook
-		let authResult: AuthHookResult | undefined;
-		if (config.authHook) {
-			const headers: Record<string, string | undefined> = {};
-			request.headers.forEach((value, key) => {
-				headers[key] = value;
-			});
-
-			authResult = await config.authHook({ request, headers });
-
-			if (!authResult.authenticated) {
-				throw createVerificationError(
-					StorageErrorCode.UNAUTHORIZED,
-					authResult.reason ?? "Authentication failed.",
-					{ authHookFailed: true },
-				);
-			}
-		}
-
-		return {
-			verified: true,
-			timestamp,
-			nonce,
-			auth: authResult?.authenticated
-				? {
-						userId: authResult.userId,
-						metadata: authResult.metadata,
-					}
-				: undefined,
-		};
+		return verifySignedRequest({
+			request,
+			config,
+			signer,
+			nonceStore,
+		});
 	};
 }
 
@@ -310,7 +462,7 @@ export function createClientRequestSigner(config: RequestSigningConfig): {
 			});
 
 			return {
-				headers: result.headers as Record<string, string>,
+				headers: headersToRecord(result.headers),
 				timestamp: result.timestamp,
 				signature: result.signature,
 			};
