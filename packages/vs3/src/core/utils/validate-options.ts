@@ -1,5 +1,6 @@
 import { StorageErrorCode } from "../error/codes";
 import { StorageServerError } from "../error/error";
+import { getAllowedFileTypesConfigIssue } from "../validation/file-validator";
 import type { StorageOptions } from "../../types/options";
 
 /**
@@ -38,4 +39,11 @@ export function validateStorageOptions(
 	options: StorageOptions,
 ): void {
 	validateMaxFileSize(options.maxFileSize);
+
+	const allowedFileTypesIssue = getAllowedFileTypesConfigIssue(
+		options.allowedFileTypes,
+	);
+	if (allowedFileTypesIssue) {
+		throw new StorageServerError(allowedFileTypesIssue);
+	}
 }
