@@ -30,4 +30,16 @@ export type StorageClientOptions<
 	 * ```
 	 */
 	maxFileSize?: number;
+
+	/**
+	 * Allowed file types for client-side validation.
+	 * Supports MIME types (e.g. "image/png" or "image/*") and file extensions (e.g. ".png").
+	 * When provided, the client validates MIME type, extension, and magic bytes (when available)
+	 * before requesting an upload URL.
+	 *
+	 * **Important:** This should match the server-side `allowedFileTypes` configuration in StorageOptions
+	 * to ensure consistent behavior. The server will always enforce its own rules regardless of
+	 * client-side validation.
+	 */
+	allowedFileTypes?: string[];
 };

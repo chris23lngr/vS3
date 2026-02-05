@@ -7,35 +7,244 @@ import {
 	StorageError,
 } from "../core/error/error";
 import { formatFileSize } from "../core/utils/format-file-size";
+import {
+	getAllowedFileTypesConfigIssue,
+	getFileNameValidationIssue,
+	getFileTypeValidationIssue,
+	getMagicByteLength,
+	type FileValidationIssue,
+} from "../core/validation/file-validator";
 import type { StandardSchemaV1 } from "../types/standard-schema";
+import type { FileInfo } from "../types/file";
 import { createFetchSchema } from "./fetch-schema";
 import type { StorageClientOptions } from "./types";
 import { xhrUpload } from "./xhr/upload";
 
-/**
- * Validates client options at configuration time.
- * @param maxFileSize - The maximum file size in bytes
- * @throws {StorageClientError} If maxFileSize is invalid
- */
-function validateClientOptions(maxFileSize: number | undefined): void {
-	if (maxFileSize === undefined) {
+type ClientValidationOptions = {
+	maxFileSize: number | undefined;
+	allowedFileTypes: string[] | undefined;
+};
+
+type UploadValidationInput = {
+	file: File;
+	maxFileSize: number | undefined;
+	allowedFileTypes: string[] | undefined;
+	onError?: (error: StorageError) => void;
+};
+
+type UploadValidationResult = {
+	fileInfo: FileInfo;
+};
+
+function createClientValidationError(
+	issue: FileValidationIssue,
+): StorageClientError {
+	return new StorageClientError(issue);
+}
+
+async function readMagicBytes(file: File): Promise<Uint8Array | undefined> {
+	const maxBytes = Math.min(file.size, getMagicByteLength());
+	if (maxBytes === 0) {
+		return undefined;
+	}
+	const buffer = await file.slice(0, maxBytes).arrayBuffer();
+	return new Uint8Array(buffer);
+}
+
+function failValidation(
+	error: StorageClientError,
+	onError?: (error: StorageError) => void,
+): never {
+	onError?.(error);
+	throw error;
+}
+
+function buildFileInfo(file: File): FileInfo {
+	return {
+		contentType: file.type,
+		name: file.name,
+		size: file.size ?? 0,
+	};
+}
+
+function validateFileSizeForClient(
+	file: File,
+	maxFileSize: number | undefined,
+	onError?: (error: StorageError) => void,
+): void {
+	if (maxFileSize === undefined || file.size <= maxFileSize) {
 		return;
 	}
 
-	if (!Number.isFinite(maxFileSize)) {
-		throw new StorageClientError({
+	const error = new StorageClientError({
+		code: StorageErrorCode.FILE_TOO_LARGE,
+		message: `File size ${formatFileSize(file.size)} exceeds maximum allowed size of ${formatFileSize(maxFileSize)} (${maxFileSize} bytes).`,
+		details: {
+			fileSize: file.size,
+			maxFileSize,
+			fileName: file.name,
+		},
+	});
+
+	failValidation(error, onError);
+}
+
+function validateFileNameForClient(
+	fileName: string,
+	onError?: (error: StorageError) => void,
+): void {
+	const nameIssue = getFileNameValidationIssue(fileName);
+	if (nameIssue) {
+		failValidation(createClientValidationError(nameIssue), onError);
+	}
+}
+
+async function readFileBytesForValidation(
+	file: File,
+	allowedFileTypes: string[] | undefined,
+	onError?: (error: StorageError) => void,
+): Promise<Uint8Array | undefined> {
+	if (!allowedFileTypes) {
+		return undefined;
+	}
+
+	try {
+		return await readMagicBytes(file);
+	} catch (error) {
+		const storageError = new StorageClientError({
 			code: StorageErrorCode.INVALID_FILE_INFO,
-			message: "Invalid maxFileSize configuration.",
-			details: "maxFileSize must be a finite number.",
+			message: "Failed to read file bytes for validation.",
+			details: error instanceof Error ? error.message : String(error),
+		});
+		failValidation(storageError, onError);
+	}
+}
+
+function validateFileTypeForClient(
+	fileInfo: FileInfo,
+	allowedFileTypes: string[] | undefined,
+	fileBytes: Uint8Array | undefined,
+	onError?: (error: StorageError) => void,
+): void {
+	const fileTypeIssue = getFileTypeValidationIssue({
+		fileInfo,
+		allowedFileTypes,
+		fileBytes,
+	});
+	if (fileTypeIssue) {
+		failValidation(createClientValidationError(fileTypeIssue), onError);
+	}
+}
+
+async function executeUploadRequest<M extends StandardSchemaV1>(
+	$fetch: ReturnType<typeof createFetch>,
+	file: File,
+	fileInfo: FileInfo,
+	metadata: StandardSchemaV1.InferInput<M>,
+	onProgress?: (progress: number) => void,
+): Promise<UploadFileResult> {
+	const response = await $fetch("/upload-url", {
+		body: {
+			fileInfo,
+			metadata,
+		},
+	});
+
+	if (response.error) {
+		throw new StorageClientError({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: `${response.error.status}: ${response.error.message ?? "Unknown error"}`,
+			message: response.error.message ?? "Unknown error",
 		});
 	}
 
-	if (maxFileSize <= 0) {
-		throw new StorageClientError({
-			code: StorageErrorCode.INVALID_FILE_INFO,
-			message: "Invalid maxFileSize configuration.",
-			details: "maxFileSize must be greater than 0.",
-		});
+	const { key, presignedUrl } = response.data;
+	const uploadResult = await xhrUpload(presignedUrl, file, {
+		onProgress,
+	});
+
+	return {
+		key,
+		presignedUrl,
+		uploadUrl: uploadResult.uploadUrl,
+		status: uploadResult.status,
+		statusText: uploadResult.statusText,
+	};
+}
+
+function handleUploadError(
+	error: unknown,
+	onError?: (error: StorageError) => void,
+): never {
+	if (error instanceof StorageError) {
+		onError?.(error);
+		throw error;
+	}
+
+	const storageError = new StorageClientError({
+		code: StorageErrorCode.NETWORK_ERROR,
+		message:
+			error instanceof Error ? error.message : "Upload failed unexpectedly",
+		details: error instanceof Error ? error.stack : String(error),
+	});
+
+	onError?.(storageError);
+	throw storageError;
+}
+
+async function validateUploadFileInput(
+	input: UploadValidationInput,
+): Promise<UploadValidationResult> {
+	const fileInfo = buildFileInfo(input.file);
+
+	validateFileSizeForClient(input.file, input.maxFileSize, input.onError);
+	validateFileNameForClient(fileInfo.name, input.onError);
+
+	const fileBytes = await readFileBytesForValidation(
+		input.file,
+		input.allowedFileTypes,
+		input.onError,
+	);
+	validateFileTypeForClient(
+		fileInfo,
+		input.allowedFileTypes,
+		fileBytes,
+		input.onError,
+	);
+
+	return {
+		fileInfo,
+	};
+}
+
+/**
+ * Validates client options at configuration time.
+ * @throws {StorageClientError} If maxFileSize or allowedFileTypes are invalid
+ */
+function validateClientOptions(options: ClientValidationOptions): void {
+	if (options.maxFileSize !== undefined) {
+		if (!Number.isFinite(options.maxFileSize)) {
+			throw new StorageClientError({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+				message: "Invalid maxFileSize configuration.",
+				details: "maxFileSize must be a finite number.",
+			});
+		}
+
+		if (options.maxFileSize <= 0) {
+			throw new StorageClientError({
+				code: StorageErrorCode.INVALID_FILE_INFO,
+				message: "Invalid maxFileSize configuration.",
+				details: "maxFileSize must be greater than 0.",
+			});
+		}
+	}
+
+	const allowedFileTypesIssue = getAllowedFileTypesConfigIssue(
+		options.allowedFileTypes,
+	);
+	if (allowedFileTypesIssue) {
+		throw createClientValidationError(allowedFileTypesIssue);
 	}
 }
 
@@ -64,9 +273,14 @@ export function createBaseClient<
 	M extends StandardSchemaV1 = StandardSchemaV1,
 	O extends StorageClientOptions<M> = StorageClientOptions<M>,
 >(options: O) {
-	const { baseURL = DEFAULT_BASE_URL, apiPath = DEFAULT_API_PATH, maxFileSize } = options;
+	const {
+		baseURL = DEFAULT_BASE_URL,
+		apiPath = DEFAULT_API_PATH,
+		maxFileSize,
+		allowedFileTypes,
+	} = options;
 
-	validateClientOptions(maxFileSize);
+	validateClientOptions({ maxFileSize, allowedFileTypes });
 
 	const apiUrl = new URL(apiPath, baseURL);
 
@@ -106,72 +320,25 @@ export function createBaseClient<
 			>,
 		): Promise<UploadFileResult> => {
 			const { onError, onSuccess, onProgress } = options ?? {};
-
-			if (maxFileSize !== undefined && file.size > maxFileSize) {
-				const error = new StorageClientError({
-					code: StorageErrorCode.FILE_TOO_LARGE,
-					message: `File size ${formatFileSize(file.size)} exceeds maximum allowed size of ${formatFileSize(maxFileSize)} (${maxFileSize} bytes).`,
-					details: {
-						fileSize: file.size,
-						maxFileSize,
-						fileName: file.name,
-					},
-				});
-				onError?.(error);
-				throw error;
-			}
+			const { fileInfo } = await validateUploadFileInput({
+				file,
+				maxFileSize,
+				allowedFileTypes,
+				onError,
+			});
 
 			try {
-				const response = await $fetch("/upload-url", {
-					body: {
-						fileInfo: {
-							contentType: file.type,
-							name: file.name,
-							size: file.size ?? 0,
-						},
-						metadata,
-					},
-				});
-
-				if (response.error) {
-					throw new StorageClientError({
-						code: StorageErrorCode.UNKNOWN_ERROR,
-						details: `${response.error.status}: ${response.error.message ?? "Unknown error"}`,
-						message: response.error.message ?? "Unknown error",
-					});
-				}
-
-				const { key, presignedUrl } = response.data;
-
-				const uploadResult = await xhrUpload(presignedUrl, file, {
+				const result = await executeUploadRequest<NonNullable<O["metadataSchema"]>>(
+					$fetch,
+					file,
+					fileInfo,
+					metadata,
 					onProgress,
-				});
-
-				const result: UploadFileResult = {
-					key,
-					presignedUrl,
-					uploadUrl: uploadResult.uploadUrl,
-					status: uploadResult.status,
-					statusText: uploadResult.statusText,
-				};
-
+				);
 				onSuccess?.(result);
 				return result;
 			} catch (error) {
-				if (error instanceof StorageError) {
-					onError?.(error);
-					throw error;
-				}
-
-				const storageError = new StorageClientError({
-					code: StorageErrorCode.NETWORK_ERROR,
-					message:
-						error instanceof Error ? error.message : "Upload failed unexpectedly",
-					details: error instanceof Error ? error.stack : String(error),
-				});
-
-				onError?.(storageError);
-				throw storageError;
+				handleUploadError(error, onError);
 			}
 		},
 	};

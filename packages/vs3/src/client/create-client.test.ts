@@ -521,5 +521,113 @@ describe("createBaseClient", () => {
 				});
 			});
 		});
+
+		describe("client-side file type validation", () => {
+			it("accepts file when type and extension are allowed", async () => {
+				const metadataSchema = z.object({
+					userId: z.string(),
+				});
+
+				const { createFetch } = await import("@better-fetch/fetch");
+				const mockFetchFn = vi.fn().mockResolvedValue({
+					error: null,
+					data: {
+						key: "uploads/photo.png",
+						presignedUrl: "https://s3.example.com/upload",
+					},
+				});
+
+				(createFetch as ReturnType<typeof vi.fn>).mockReturnValue(mockFetchFn);
+
+				const client = createBaseClient({
+					baseURL: mockBaseURL,
+					apiPath: mockApiPath,
+					metadataSchema,
+					allowedFileTypes: ["image/png", ".png"],
+				});
+
+				const mockFile = new File(["png"], "photo.png", {
+					type: "image/png",
+				});
+
+				const mockUploadResult = {
+					uploadUrl: "https://s3.example.com/upload",
+					status: 200,
+					statusText: "OK",
+				};
+
+				vi.spyOn(xhrUploadModule, "xhrUpload").mockResolvedValue(mockUploadResult);
+
+				await expect(
+					client.uploadFile(mockFile, { userId: "user-1" }),
+				).resolves.toMatchObject({
+					key: "uploads/photo.png",
+					status: 200,
+				});
+			});
+
+			it("rejects file when MIME type is not allowed", async () => {
+				const metadataSchema = z.object({
+					userId: z.string(),
+				});
+
+				const { createFetch } = await import("@better-fetch/fetch");
+				const mockFetchFn = vi.fn();
+
+				(createFetch as ReturnType<typeof vi.fn>).mockReturnValue(mockFetchFn);
+
+				const client = createBaseClient({
+					baseURL: mockBaseURL,
+					apiPath: mockApiPath,
+					metadataSchema,
+					allowedFileTypes: ["image/png"],
+				});
+
+				const mockFile = new File(["jpeg"], "photo.png", {
+					type: "image/jpeg",
+				});
+
+				await expect(
+					client.uploadFile(mockFile, { userId: "user-1" }),
+				).rejects.toMatchObject({
+					code: StorageErrorCode.INVALID_FILE_INFO,
+					message: "File type is not allowed.",
+				});
+
+				expect(mockFetchFn).not.toHaveBeenCalled();
+			});
+
+			it("rejects spoofed file types using magic bytes", async () => {
+				const metadataSchema = z.object({
+					userId: z.string(),
+				});
+
+				const { createFetch } = await import("@better-fetch/fetch");
+				const mockFetchFn = vi.fn();
+
+				(createFetch as ReturnType<typeof vi.fn>).mockReturnValue(mockFetchFn);
+
+				const client = createBaseClient({
+					baseURL: mockBaseURL,
+					apiPath: mockApiPath,
+					metadataSchema,
+					allowedFileTypes: ["image/png"],
+				});
+
+				const jpegHeader = new Uint8Array([0xff, 0xd8, 0xff, 0x00]);
+				const mockFile = new File([jpegHeader], "photo.png", {
+					type: "image/png",
+				});
+
+				await expect(
+					client.uploadFile(mockFile, { userId: "user-1" }),
+				).rejects.toMatchObject({
+					code: StorageErrorCode.INVALID_FILE_INFO,
+					message: "File content type is not allowed.",
+				});
+
+				expect(mockFetchFn).not.toHaveBeenCalled();
+			});
+		});
 	});
 });
