@@ -82,6 +82,25 @@ describe("StorageError", () => {
 			expect(error.code).toBe(code);
 		}
 	});
+
+	it("stores origin field correctly", () => {
+		const clientError = new StorageError({
+			origin: "client",
+			message: "Test",
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: undefined,
+		});
+
+		const serverError = new StorageError({
+			origin: "server",
+			message: "Test",
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: undefined,
+		});
+
+		expect(clientError.origin).toBe("client");
+		expect(serverError.origin).toBe("server");
+	});
 });
 
 describe("StorageClientError", () => {
@@ -92,7 +111,7 @@ describe("StorageClientError", () => {
 			details: undefined,
 		});
 
-		expect(error.name).toBe("StorageError");
+		expect(error.name).toBe("StorageClientError");
 	});
 
 	it("creates client error with correct properties", () => {
@@ -126,6 +145,16 @@ describe("StorageClientError", () => {
 
 		expect(error).toBeInstanceOf(StorageClientError);
 	});
+
+	it("automatically sets origin to client", () => {
+		const error = new StorageClientError({
+			message: "Client error",
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			details: undefined,
+		});
+
+		expect(error.origin).toBe("client");
+	});
 });
 
 describe("StorageServerError", () => {
@@ -136,7 +165,7 @@ describe("StorageServerError", () => {
 			details: undefined,
 		});
 
-		expect(error.name).toBe("StorageError");
+		expect(error.name).toBe("StorageServerError");
 	});
 
 	it("creates server error with correct properties", () => {
@@ -169,5 +198,15 @@ describe("StorageServerError", () => {
 		});
 
 		expect(error).toBeInstanceOf(StorageServerError);
+	});
+
+	it("automatically sets origin to server", () => {
+		const error = new StorageServerError({
+			message: "Server error",
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			details: undefined,
+		});
+
+		expect(error.origin).toBe("server");
 	});
 });
