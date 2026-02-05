@@ -1,3 +1,5 @@
+// biome-ignore-all lint/suspicious/noControlCharactersInRegex: intentionally matching control characters for security validation
+
 /**
  * Default maximum filename length.
  * Common filesystem limit (ext4, NTFS, HFS+) is 255 bytes; this value is
@@ -50,10 +52,8 @@ export type SanitizationOperation =
 	| "truncated_length"
 	| "used_fallback";
 
-// biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching control characters for security
 const CONTROL_CHAR_REGEX = /[\x00-\x1F\x7F]/g;
 const CONTROL_CHAR_TEST_REGEX = /[\x00-\x1F\x7F]/;
-// biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching null bytes for security
 const NULL_BYTE_REGEX = /\x00/g;
 const PATH_SEPARATOR_REGEX = /[/\\]/g;
 const PATH_SEPARATOR_CHAR_REGEX = /[/\\]/;
@@ -256,8 +256,7 @@ function normalizeOptions(
 	options: SanitizeFilenameOptions,
 ): Required<SanitizeFilenameOptions> {
 	const maxLength = normalizeMaxLength(options.maxLength);
-	const fallbackFilename =
-		options.fallbackFilename ?? DEFAULT_FALLBACK_FILENAME;
+	const fallbackFilename = options.fallbackFilename ?? DEFAULT_FALLBACK_FILENAME;
 	const replacementCandidate = options.replacementChar ?? "_";
 	const replacementChar = isValidReplacementChar(replacementCandidate)
 		? replacementCandidate
