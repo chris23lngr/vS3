@@ -46,6 +46,7 @@ export type SanitizeFilenameResult = {
 export type SanitizationOperation =
 	| "removed_control_characters"
 	| "removed_null_bytes"
+	| "decoded_percent_encoding"
 	| "removed_path_separators"
 	| "removed_path_traversal"
 	| "trimmed_whitespace"
@@ -60,6 +61,9 @@ const PATH_SEPARATOR_CHAR_REGEX = /[/\\]/;
 const CONSECUTIVE_DOTS_REGEX = /\.{2,}/g;
 const LEADING_TRAILING_DOTS_REGEX = /^\.+|\.+$/g;
 const SINGLE_CHAR_REGEX = /^.$/u;
+const PERCENT_ENCODED_SLASH_REGEX = /%2f/gi;
+const PERCENT_ENCODED_BACKSLASH_REGEX = /%5c/gi;
+const PERCENT_ENCODED_DOT_REGEX = /%2e/gi;
 
 /**
  * Extracts the file extension from a filename.
@@ -140,6 +144,16 @@ function removePathTraversal(value: string): {
 	return { result, modified: result !== value };
 }
 
+function decodePercentEncoding(value: string): {
+	result: string;
+	modified: boolean;
+} {
+	let result = value.replace(PERCENT_ENCODED_SLASH_REGEX, "/");
+	result = result.replace(PERCENT_ENCODED_BACKSLASH_REGEX, "\\");
+	result = result.replace(PERCENT_ENCODED_DOT_REGEX, ".");
+	return { result, modified: result !== value };
+}
+
 /**
  * Truncates a filename to a maximum length while preserving the extension.
  */
@@ -181,52 +195,78 @@ function collapseReplacementChars(
 	return value.replace(consecutiveRegex, replacementChar);
 }
 
-function applySanitizationSteps(
+function applyStep(
+	applied: SanitizationOperation[],
+	operation: SanitizationOperation,
+	result: { result: string; modified: boolean },
+): string {
+	if (result.modified) {
+		applied.push(operation);
+	}
+	return result.result;
+}
+
+function applySecurityRemovals(
 	filename: string,
 	replacementChar: string,
 ): { value: string; applied: SanitizationOperation[] } {
 	const applied: SanitizationOperation[] = [];
 	let current = filename;
 
-	const nullByteResult = removeNullBytes(current);
-	if (nullByteResult.modified) {
-		applied.push("removed_null_bytes");
-	}
-	current = nullByteResult.result;
+	current = applyStep(applied, "removed_null_bytes", removeNullBytes(current));
+	current = applyStep(
+		applied,
+		"removed_control_characters",
+		removeControlCharacters(current, replacementChar),
+	);
+	current = applyStep(
+		applied,
+		"decoded_percent_encoding",
+		decodePercentEncoding(current),
+	);
+	current = applyStep(
+		applied,
+		"removed_path_separators",
+		removePathSeparators(current, replacementChar),
+	);
+	current = applyStep(
+		applied,
+		"removed_path_traversal",
+		removePathTraversal(current),
+	);
 
-	const controlCharResult = removeControlCharacters(current, replacementChar);
-	if (controlCharResult.modified) {
-		applied.push("removed_control_characters");
-	}
-	current = controlCharResult.result;
+	return { value: current, applied };
+}
 
-	const pathSepResult = removePathSeparators(current, replacementChar);
-	if (pathSepResult.modified) {
-		applied.push("removed_path_separators");
-	}
-	current = pathSepResult.result;
-
-	const traversalResult = removePathTraversal(current);
-	if (traversalResult.modified) {
-		applied.push("removed_path_traversal");
-	}
-	current = traversalResult.result;
-
-	const trimmed = current.trim();
-	if (trimmed !== current) {
+function applyWhitespaceAndReplacements(
+	value: string,
+	replacementChar: string,
+	applied: SanitizationOperation[],
+): string {
+	const trimmed = value.trim();
+	if (trimmed !== value) {
 		applied.push("trimmed_whitespace");
 	}
-	current = trimmed;
-
-	current = collapseReplacementChars(current, replacementChar);
-
+	let current = collapseReplacementChars(trimmed, replacementChar);
 	if (replacementChar) {
 		const escaped = replacementChar.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 		const leadingTrailingRegex = new RegExp(`^${escaped}+|${escaped}+$`, "g");
 		current = current.replace(leadingTrailingRegex, "");
 	}
+	return current;
+}
 
-	return { value: current, applied };
+function applySanitizationSteps(
+	filename: string,
+	replacementChar: string,
+): { value: string; applied: SanitizationOperation[] } {
+	const removals = applySecurityRemovals(filename, replacementChar);
+	const cleaned = applyWhitespaceAndReplacements(
+		removals.value,
+		replacementChar,
+		removals.applied,
+	);
+	return { value: cleaned, applied: removals.applied };
 }
 
 function isValidReplacementChar(value: string): boolean {

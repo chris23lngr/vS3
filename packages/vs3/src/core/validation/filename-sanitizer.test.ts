@@ -403,12 +403,13 @@ describe("filename-sanitizer", () => {
 			});
 
 			it("sanitizes double dots even in URL-encoded strings", () => {
-				// Double dots are removed for security even if surrounded by encoded chars
-				// This prevents attacks where strings might be decoded later
+				// Percent-encoded path separators are normalized before sanitization.
+				// This prevents traversal if the string is decoded later.
 				const result = sanitizeFilename("..%2f..%2fetc%2fpasswd");
 				expect(result.sanitized).not.toContain("..");
-				// The leading dots are removed
-				expect(result.sanitized).toBe("%2f.%2fetc%2fpasswd");
+				expect(result.sanitized).not.toContain("%2f");
+				expect(result.sanitized).not.toContain("/");
+				expect(result.sanitized).not.toContain("\\");
 			});
 
 			it("handles very long path traversal attempts", () => {
