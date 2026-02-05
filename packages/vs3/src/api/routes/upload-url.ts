@@ -164,7 +164,6 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 
 			const {
 				adapter,
-				metadataSchema,
 				generateKey,
 				maxFileSize,
 				contentValidators,
