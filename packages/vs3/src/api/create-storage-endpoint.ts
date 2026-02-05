@@ -76,6 +76,7 @@ export function createStorageEndpoint<
 ): StrictEndpoint<Path, ExtendedOptions<Options, M>, Response> {
 	const { metadataSchema, requireMetadata, middlewares, ...endpointOptions } =
 		options;
+	const emptyContext: StorageContext = {};
 	const isUndefinedMetadata =
 		metadataSchema instanceof z.ZodUndefined ||
 		metadataSchema instanceof z.ZodNever;
@@ -105,18 +106,25 @@ export function createStorageEndpoint<
 			use: [
 				createMiddleware(async (betterCallCtx) => {
 					if (middlewares && middlewares.length > 0) {
-						const request = betterCallCtx.request ?? new Request("http://localhost");
+						const requestPath = betterCallCtx.path.startsWith("/")
+							? betterCallCtx.path
+							: `/${betterCallCtx.path}`;
+						const request =
+							betterCallCtx.request ??
+							new Request(`http://localhost${requestPath}`, {
+								method: betterCallCtx.method,
+							});
 						const storageCtx: StorageMiddlewareContext = {
 							method: betterCallCtx.method,
 							path: betterCallCtx.path,
 							request,
 							headers: betterCallCtx.headers ?? request.headers,
-							context: {} as StorageContext,
+							context: emptyContext,
 						};
 						const { context } = await executeMiddlewareChain(middlewares, storageCtx);
 						return context;
 					}
-					return {} as StorageContext;
+					return emptyContext;
 				}),
 			],
 			body: bodySchema,
