@@ -1,5 +1,6 @@
 import { StorageErrorCode } from "../core/error/codes";
 import { StorageServerError } from "../core/error/error";
+import { sanitizeFilename } from "../core/validation/filename-sanitizer";
 import type { FileInfo } from "../types/file";
 
 /**
@@ -12,10 +13,13 @@ import type { FileInfo } from "../types/file";
  * @param metadata
  */
 export function generateObjectKey({ name }: FileInfo) {
-	const lastDot = name.lastIndexOf(".");
+	const sanitizedName = sanitizeFilename(name).sanitized;
+	const lastDot = sanitizedName.lastIndexOf(".");
 	const extension =
-		lastDot > 0 && lastDot < name.length - 1 ? name.slice(lastDot + 1) : "";
-	const fileName = lastDot > 0 ? name.slice(0, lastDot) : "";
+		lastDot > 0 && lastDot < sanitizedName.length - 1
+			? sanitizedName.slice(lastDot + 1)
+			: "";
+	const fileName = lastDot > 0 ? sanitizedName.slice(0, lastDot) : "";
 
 	if (!extension) {
 		throw new StorageServerError({

@@ -44,6 +44,16 @@ describe("generateObjectKey", () => {
 		expect(key).toBe("uuid-123-photo.JPEG");
 	});
 
+	it("sanitizes path traversal before generating a key", () => {
+		const key = generateObjectKey({
+			name: "../private.png",
+			size: 1,
+			contentType: "image/png",
+		});
+
+		expect(key).toBe("uuid-123--private.png");
+	});
+
 	it("throws INVALID_FILE_INFO when no extension exists", () => {
 		try {
 			generateObjectKey({
