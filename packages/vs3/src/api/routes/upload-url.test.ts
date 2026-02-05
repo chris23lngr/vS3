@@ -156,8 +156,38 @@ describe("upload-url route", () => {
 			}),
 		).rejects.toMatchObject({
 			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
-			message: "Router context is not available.",
+			message: "Storage context is not available.",
 		});
+	});
+
+	it("provides helpful error message when context is missing", async () => {
+		const endpoint = createUploadUrlRoute(
+			z.object({
+				userId: z.string(),
+			}),
+		);
+
+		try {
+			await callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: {
+						userId: "test",
+					},
+				},
+				context: {},
+			});
+			// Should not reach here
+			expect(true).toBe(false);
+		} catch (error) {
+			expect(error).toBeInstanceOf(StorageServerError);
+			const storageError = error as StorageServerError;
+			expect(storageError.message).toContain("Storage context is not available");
+			expect(storageError.details).toContain("createStorage()");
+			expect(storageError.details).toContain(
+				"not calling raw endpoint handlers directly",
+			);
+		}
 	});
 
 	it("surfaces schema validation errors for invalid file info", async () => {

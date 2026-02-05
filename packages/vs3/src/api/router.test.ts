@@ -88,4 +88,44 @@ describe("router", () => {
 
 		expect(response.status).toBe(400);
 	});
+
+	it("reliably injects context with $options for all requests", async () => {
+		const adapter = createAdapter();
+		const options = {
+			bucket: "context-test-bucket",
+			adapter,
+			metadataSchema: z.object({
+				userId: z.string(),
+			}),
+			generateKey: vi.fn().mockResolvedValue("test-key.png"),
+		};
+		const context = createContext(options);
+		const { handler } = router(options, context);
+
+		const request = new Request("http://localhost/upload-url", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+			},
+			body: JSON.stringify({
+				fileInfo: {
+					name: "test.png",
+					size: 100,
+					contentType: "image/png",
+				},
+				metadata: {
+					userId: "test-user",
+				},
+			}),
+		});
+
+		const response = await handler(request);
+		const data = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(data).toHaveProperty("presignedUrl");
+		expect(data).toHaveProperty("key");
+		// Verify the adapter was called (which means context was available)
+		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalled();
+	});
 });

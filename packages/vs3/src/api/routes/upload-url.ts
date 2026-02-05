@@ -21,12 +21,19 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 			outputSchema: schemas.output,
 		},
 		async (ctx) => {
-			if (ctx.context.$options === undefined) {
+			if (
+				ctx.context === null ||
+				ctx.context === undefined ||
+				ctx.context.$options === null ||
+				ctx.context.$options === undefined
+			) {
 				throw new StorageServerError({
 					code: StorageErrorCode.INTERNAL_SERVER_ERROR,
-					message: "Router context is not available.",
+					message: "Storage context is not available.",
 					details:
-						"Unable to access the context options from the router. Config was likely not passed to the router.",
+						"Storage context or $options is missing. The endpoint was called without proper context injection. " +
+						"Ensure you are using createStorage() and calling endpoints through the returned API, " +
+						"not calling raw endpoint handlers directly.",
 				});
 			}
 
