@@ -67,6 +67,19 @@ describe("createBaseClient", () => {
 
 			const result = await client.uploadFile(mockFile, { userId: "user-1" });
 
+			expect(mockFetchFn).toHaveBeenCalledWith("/upload-url", {
+				body: {
+					fileInfo: {
+						contentType: "text/plain",
+						name: "test.txt",
+						size: mockFile.size,
+					},
+					metadata: {
+						userId: "user-1",
+					},
+				},
+			});
+
 			// Verify xhrUpload was called and awaited
 			expect(xhrUploadSpy).toHaveBeenCalledWith(
 				"https://s3.example.com/upload",
