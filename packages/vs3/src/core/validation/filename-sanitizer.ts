@@ -1,6 +1,7 @@
 /**
  * Default maximum filename length.
- * Common filesystem limit (ext4, NTFS, HFS+) is 255 bytes.
+ * Common filesystem limit (ext4, NTFS, HFS+) is 255 bytes; this value is
+ * enforced as a character length, not a byte limit.
  */
 export const DEFAULT_MAX_FILENAME_LENGTH = 255;
 
@@ -51,11 +52,14 @@ export type SanitizationOperation =
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching control characters for security
 const CONTROL_CHAR_REGEX = /[\x00-\x1F\x7F]/g;
+const CONTROL_CHAR_TEST_REGEX = /[\x00-\x1F\x7F]/;
 // biome-ignore lint/suspicious/noControlCharactersInRegex: intentionally matching null bytes for security
 const NULL_BYTE_REGEX = /\x00/g;
 const PATH_SEPARATOR_REGEX = /[/\\]/g;
+const PATH_SEPARATOR_CHAR_REGEX = /[/\\]/;
 const CONSECUTIVE_DOTS_REGEX = /\.{2,}/g;
 const LEADING_TRAILING_DOTS_REGEX = /^\.+|\.+$/g;
+const SINGLE_CHAR_REGEX = /^.$/u;
 
 /**
  * Extracts the file extension from a filename.
@@ -225,6 +229,47 @@ function applySanitizationSteps(
 	return { value: current, applied };
 }
 
+function isValidReplacementChar(value: string): boolean {
+	if (value.length === 0) {
+		return true;
+	}
+	if (!SINGLE_CHAR_REGEX.test(value)) {
+		return false;
+	}
+	if (PATH_SEPARATOR_CHAR_REGEX.test(value)) {
+		return false;
+	}
+	return !CONTROL_CHAR_TEST_REGEX.test(value);
+}
+
+function normalizeMaxLength(value: number | undefined): number {
+	if (!Number.isFinite(value) || value === undefined) {
+		return DEFAULT_MAX_FILENAME_LENGTH;
+	}
+	if (!Number.isInteger(value) || value < 1) {
+		return DEFAULT_MAX_FILENAME_LENGTH;
+	}
+	return value;
+}
+
+function normalizeOptions(
+	options: SanitizeFilenameOptions,
+): Required<SanitizeFilenameOptions> {
+	const maxLength = normalizeMaxLength(options.maxLength);
+	const fallbackFilename =
+		options.fallbackFilename ?? DEFAULT_FALLBACK_FILENAME;
+	const replacementCandidate = options.replacementChar ?? "_";
+	const replacementChar = isValidReplacementChar(replacementCandidate)
+		? replacementCandidate
+		: "_";
+
+	return {
+		maxLength,
+		fallbackFilename,
+		replacementChar,
+	};
+}
+
 /**
  * Sanitizes a filename by removing dangerous characters and patterns.
  *
@@ -245,11 +290,8 @@ export function sanitizeFilename(
 	filename: string,
 	options: SanitizeFilenameOptions = {},
 ): SanitizeFilenameResult {
-	const {
-		maxLength = DEFAULT_MAX_FILENAME_LENGTH,
-		fallbackFilename = DEFAULT_FALLBACK_FILENAME,
-		replacementChar = "_",
-	} = options;
+	const { maxLength, fallbackFilename, replacementChar } =
+		normalizeOptions(options);
 
 	const sanitized = applySanitizationSteps(filename, replacementChar);
 	const appliedOperations = sanitized.applied;

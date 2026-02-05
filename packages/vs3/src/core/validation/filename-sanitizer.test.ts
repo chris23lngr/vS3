@@ -246,6 +246,18 @@ describe("filename-sanitizer", () => {
 				expect(result.sanitized).toBe(filename);
 				expect(result.wasModified).toBe(false);
 			});
+
+			it("uses default max length when maxLength is zero", () => {
+				const longName = `${"a".repeat(300)}.txt`;
+				const result = sanitizeFilename(longName, { maxLength: 0 });
+				expect(result.sanitized.length).toBe(DEFAULT_MAX_FILENAME_LENGTH);
+			});
+
+			it("uses default max length when maxLength is negative", () => {
+				const longName = `${"a".repeat(300)}.txt`;
+				const result = sanitizeFilename(longName, { maxLength: -5 });
+				expect(result.sanitized.length).toBe(DEFAULT_MAX_FILENAME_LENGTH);
+			});
 		});
 
 		describe("fallback filename", () => {
@@ -311,6 +323,34 @@ describe("filename-sanitizer", () => {
 					replacementChar: "",
 				});
 				expect(result.sanitized).toBe("filename.txt");
+			});
+
+			it("falls back to underscore for slash replacement character", () => {
+				const result = sanitizeFilename("path/to/file.txt", {
+					replacementChar: "/",
+				});
+				expect(result.sanitized).toBe("path_to_file.txt");
+			});
+
+			it("falls back to underscore for backslash replacement character", () => {
+				const result = sanitizeFilename("path\\to\\file.txt", {
+					replacementChar: "\\",
+				});
+				expect(result.sanitized).toBe("path_to_file.txt");
+			});
+
+			it("falls back to underscore for control replacement character", () => {
+				const result = sanitizeFilename("file\nname.txt", {
+					replacementChar: "\n",
+				});
+				expect(result.sanitized).toBe("file_name.txt");
+			});
+
+			it("falls back to underscore for multi-character replacement", () => {
+				const result = sanitizeFilename("file/name.txt", {
+					replacementChar: "--",
+				});
+				expect(result.sanitized).toBe("file_name.txt");
 			});
 		});
 
