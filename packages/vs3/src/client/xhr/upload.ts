@@ -62,6 +62,111 @@ export type XhrUploadResult = {
 	statusText: string;
 };
 
+type UploadRequestParams = {
+	url: string;
+	file: File;
+	headers: Headers;
+	onProgress?: (progress: number) => void;
+	signal?: AbortSignal;
+};
+
+type RetryExecutionParams = {
+	maxAttempts: number;
+	retryConfig: RetryConfig;
+	execute: () => Promise<XhrUploadResult>;
+};
+
+function resolveMaxAttempts(retry?: undefined | true | number): number {
+	if (typeof retry === "number") {
+		return Math.max(1, retry);
+	}
+
+	if (retry === true) {
+		return DEFAULT_RETRY_ATTEMPTS;
+	}
+
+	return 1;
+}
+
+function normalizeError(error: unknown): Error | DOMException {
+	if (error instanceof DOMException || error instanceof Error) {
+		return error;
+	}
+
+	return new Error("Upload failed with an unknown error");
+}
+
+async function executeWithRetries({
+	maxAttempts,
+	retryConfig,
+	execute,
+}: RetryExecutionParams): Promise<XhrUploadResult> {
+	let attempt = 0;
+	let lastError: Error | DOMException | undefined;
+
+	while (attempt < maxAttempts) {
+		try {
+			return await execute();
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			lastError = normalizedError;
+			attempt++;
+
+			if (
+				normalizedError instanceof DOMException &&
+				normalizedError.name === "AbortError"
+			) {
+				throw normalizedError;
+			}
+
+			if (attempt >= maxAttempts) {
+				throw normalizedError;
+			}
+
+			const delayMs = calculateRetryDelay(attempt, retryConfig);
+			await sleep(delayMs);
+		}
+	}
+
+	throw lastError ?? new Error("Upload failed: no attempts made");
+}
+
+function createUploadRequest({
+	url,
+	file,
+	headers,
+	onProgress,
+	signal,
+}: UploadRequestParams): Promise<XhrUploadResult> {
+	return new Promise((resolve, reject) => {
+		const xhr = new XhrFactory(signal);
+		const requestHeaders = { ...headers };
+		xhr.open("PUT", url, true);
+		if (file.type && !requestHeaders["content-type"]) {
+			requestHeaders["content-type"] = file.type;
+		}
+		xhr.appendHeaders(requestHeaders);
+		xhr.appendProgressHandler(onProgress);
+		xhr.appendErrorHandler((_status, statusText, cleanup) => {
+			cleanup();
+			reject(new Error(`Error occurred: ${statusText}`));
+		});
+		xhr.appendAbortHandler(() => {
+			reject(new DOMException("Upload aborted", "AbortError"));
+		});
+		xhr.appendLoadHandler((success, status, statusText, cleanup) => {
+			if (success) {
+				cleanup();
+				resolve({ uploadUrl: url, status, statusText });
+				return;
+			}
+			cleanup();
+			reject(new Error(`Error occurred: ${statusText}`));
+		});
+		xhr.send(file);
+	});
+}
+
 /**
  * Uploads a file from the client to a given URL using XMLHttpRequest.
  */
@@ -78,85 +183,17 @@ export async function xhrUpload(
 		retryConfig = DEFAULT_RETRY_CONFIG,
 	} = options ?? {};
 
-	let maxAttempts = 1;
-
-	if (typeof retry === "number") {
-		maxAttempts = retry;
-	} else if (retry === true) {
-		maxAttempts = DEFAULT_RETRY_ATTEMPTS;
-	}
-
-	// Ensure at least one attempt is made
-	maxAttempts = Math.max(1, maxAttempts);
-
-	let attempt = 0;
-	let lastError: Error | DOMException | undefined;
-
-	while (attempt < maxAttempts) {
-		try {
-			return await new Promise((resolve, reject) => {
-				const xhr = new XhrFactory(signal);
-
-				xhr.open("PUT", url, true);
-
-				if (file.type && !headers["content-type"]) {
-					// Set the content type if it is not already set
-					headers["content-type"] = file.type;
-				}
-				xhr.appendHeaders(headers);
-
-				xhr.appendProgressHandler(onProgress);
-
-				xhr.appendErrorHandler((status, statusText, cleanup) => {
-					cleanup();
-					reject(new Error(`Error occurred: ${statusText}`));
-				});
-
-				xhr.appendAbortHandler(() => {
-					reject(new DOMException("Upload aborted", "AbortError"));
-				});
-
-				xhr.appendLoadHandler((success, status, statusText, cleanup) => {
-					if (success) {
-						cleanup();
-						resolve({
-							uploadUrl: url,
-							status: status,
-							statusText,
-						});
-						return;
-					}
-
-					// TODO: add error handling for non-success responses
-					cleanup();
-					reject(new Error(`Error occurred: ${statusText}`));
-				});
-
-				xhr.send(file);
-			});
-		} catch (error) {
-			lastError = error as Error | DOMException;
-			attempt++;
-
-			// Abort errors should not be retried
-			if (error instanceof DOMException && error.name === "AbortError") {
-				throw error;
-			}
-
-			// If we've exhausted all retry attempts, throw the error
-			if (attempt >= maxAttempts) {
-				throw error;
-			}
-
-			// Calculate delay with exponential backoff and jitter
-			const delayMs = calculateRetryDelay(attempt, retryConfig);
-
-			// Wait before retrying
-			await sleep(delayMs);
-		}
-	}
-
-	// This should only be reached if maxAttempts is 0 or negative after validation
-	// which should not happen due to Math.max(1, maxAttempts) above
-	throw lastError ?? new Error("Upload failed: no attempts made");
+	const maxAttempts = resolveMaxAttempts(retry);
+	return executeWithRetries({
+		maxAttempts,
+		retryConfig,
+		execute: () =>
+			createUploadRequest({
+				url,
+				file,
+				headers,
+				onProgress,
+				signal,
+			}),
+	});
 }
