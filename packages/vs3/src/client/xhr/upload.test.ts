@@ -2,19 +2,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as retryModule from "../../core/resilience/retry";
 import type { RetryConfig } from "../../core/resilience/retry";
 
-// Create a spy on the sleep function to verify retry delays
-let sleepSpy: ReturnType<typeof vi.spyOn>;
-
 describe("xhrUpload retry logic", () => {
-	beforeEach(() => {
-		vi.clearAllMocks();
-		sleepSpy = vi.spyOn(retryModule, "sleep").mockResolvedValue(undefined);
-	});
-
 	it("should apply exponential backoff on retries", async () => {
 		let attemptCount = 0;
 
 		vi.resetModules();
+
+		vi.doMock("../../core/resilience/retry", async () => {
+			const actual =
+				await vi.importActual<typeof import("../../core/resilience/retry")>(
+					"../../core/resilience/retry",
+				);
+
+			return {
+				...actual,
+				sleep: vi.fn().mockResolvedValue(undefined),
+			};
+		});
 
 		// Mock XhrFactory to fail first 2 attempts, succeed on 3rd
 		vi.doMock("./xhr-factory", () => ({
@@ -59,6 +63,7 @@ describe("xhrUpload retry logic", () => {
 			},
 		}));
 
+		const { sleep } = await import("../../core/resilience/retry");
 		const { xhrUpload } = await import("./upload");
 
 		const mockFile = new File(["test"], "test.txt", { type: "text/plain" });
@@ -75,10 +80,12 @@ describe("xhrUpload retry logic", () => {
 			retryConfig,
 		});
 
-		expect(sleepSpy).toHaveBeenCalledTimes(2);
-		expect(sleepSpy).toHaveBeenNthCalledWith(1, 100);
-		expect(sleepSpy).toHaveBeenNthCalledWith(2, 200);
+		const sleepMock = vi.mocked(sleep);
+		expect(sleepMock).toHaveBeenCalledTimes(2);
+		expect(sleepMock).toHaveBeenNthCalledWith(1, 100);
+		expect(sleepMock).toHaveBeenNthCalledWith(2, 200);
 
+		vi.doUnmock("../../core/resilience/retry");
 		vi.doUnmock("./xhr-factory");
 		vi.resetModules();
 	});
@@ -151,6 +158,38 @@ describe("xhrUpload retry logic", () => {
 
 describe("xhrUpload options", () => {
 	it("should accept retryConfig option in XhrUploadOptions", async () => {
+		vi.resetModules();
+
+		vi.doMock("./xhr-factory", () => ({
+			XhrFactory: class MockXhrFactory {
+				private loadHandler:
+					| ((success: boolean, status: number, statusText: string, cleanup: () => void) => void)
+					| undefined;
+
+				open() {}
+				appendHeaders() {}
+				appendProgressHandler() {}
+				appendErrorHandler() {}
+				appendAbortHandler() {}
+				appendLoadHandler(
+					handler: (
+						success: boolean,
+						status: number,
+						statusText: string,
+						cleanup: () => void,
+					) => void,
+				) {
+					this.loadHandler = handler;
+				}
+				send() {
+					if (!this.loadHandler) {
+						throw new Error("Load handler not initialized");
+					}
+					this.loadHandler(true, 200, "OK", () => {});
+				}
+			},
+		}));
+
 		const { xhrUpload } = await import("./upload");
 
 		const customRetryConfig: RetryConfig = {
@@ -164,13 +203,16 @@ describe("xhrUpload options", () => {
 		// and retryConfig is accepted as a parameter
 		const mockFile = new File(["test"], "test.txt", { type: "text/plain" });
 
-		// We expect this to fail in the test environment due to XMLHttpRequest
-		// not being available, but it proves the option is accepted
 		await expect(
 			xhrUpload("https://example.com/upload", mockFile, {
 				retry: 2,
 				retryConfig: customRetryConfig,
-			})
-		).rejects.toThrow();
+			}),
+		).resolves.toMatchObject({
+			uploadUrl: "https://example.com/upload",
+		});
+
+		vi.doUnmock("./xhr-factory");
+		vi.resetModules();
 	});
 });
