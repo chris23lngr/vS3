@@ -1,4 +1,10 @@
 export { createStorageMiddleware, executeMiddlewareChain } from "./core";
+export {
+	createClientRequestSigner,
+	createVerifySignatureMiddleware,
+	type VerificationResult,
+	type VerifySignatureMiddlewareConfig,
+} from "./signature";
 export type {
 	ChainExecutionResult,
 	MiddlewareConfig,
@@ -6,9 +12,3 @@ export type {
 	StorageMiddleware,
 	StorageMiddlewareContext,
 } from "./types";
-export {
-	createClientRequestSigner,
-	createVerifySignatureMiddleware,
-	type VerificationResult,
-	type VerifySignatureMiddlewareConfig,
-} from "./verify-signature";
