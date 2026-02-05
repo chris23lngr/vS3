@@ -25,31 +25,3 @@ export function createStorage<O extends StorageOptions>(options: O) {
 		},
 	};
 }
-
-const storage = createStorage({
-	bucket: "test",
-	adapter: aws({
-		client: new S3Client({
-			region: "us-east-1",
-			credentials: {
-				accessKeyId: "test",
-				secretAccessKey: "test",
-			},
-		}),
-	}),
-	metadataSchema: z.object({
-		userId: z.string(),
-		age: z.number().optional(),
-	}),
-});
-
-storage.api.upload({
-	body: {
-		file: {
-			contentType: "text/plain",
-			name: "test.txt",
-			size: 100,
-		},
-		metadata: {},
-	},
-});

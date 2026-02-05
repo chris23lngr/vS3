@@ -9,8 +9,12 @@ export function getEndpoints<O extends StorageOptions>(
 	context: StorageContext<O>,
 	options: O,
 ) {
+	type MetadataSchema = O extends StorageOptions<infer M> ? M : never;
+
 	const endpoints = {
-		upload: createUploadRoute(options.metadataSchema),
+		upload: createUploadRoute<MetadataSchema>(
+			options.metadataSchema as MetadataSchema,
+		),
 	} as const;
 
 	const api = toStorageEndpoints<O, typeof endpoints>(endpoints, context);

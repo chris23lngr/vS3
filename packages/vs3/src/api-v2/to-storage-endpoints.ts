@@ -30,10 +30,6 @@ type InternalContext = Partial<
 	};
 };
 
-type UserInputContext = Partial<
-	InputContext<string, any> & EndpointContext<string, any>
->;
-
 export function toStorageEndpoints<
 	O extends StorageOptions,
 	const E extends Record<
@@ -49,35 +45,37 @@ export function toStorageEndpoints<
 		>
 	>,
 >(endpoints: E, ctx: StorageContext<O> | Promise<StorageContext<O>>): E {
-	const api: Record<
-		string,
-		((
-			// context: EndpointContext<string, any> & InputContext<string, any>,
-			context: {test: string},
-		) => Promise<any>) & {
-			path?: string | undefined;
-			options?: EndpointOptions | undefined;
-		}
-	> = {};
+	const api = {} as E;
 
-	for (const [key, endpoint] of Object.entries(endpoints)) {
-		api[key] = async (context?: UserInputContext) => {
-			const storageContext = await ctx;
-			const internalContext: InternalContext = {
-				...context,
-				context: {
-					...storageContext,
-				},
+	for (const key in endpoints) {
+		const endpoint = endpoints[key];
+
+		const wrappedEndpoint = Object.assign(
+			async (context: any) => {
+				const storageContext = await ctx;
+				const internalContext: InternalContext = {
+					...context,
+					context: {
+						...storageContext,
+					},
+					path: endpoint.path,
+					headers: context?.headers
+						? new Headers(context?.headers)
+						: undefined,
+				};
+
+				return runWithEndpointContext(internalContext, () =>
+					(endpoint as any)(internalContext),
+				);
+			},
+			{
 				path: endpoint.path,
-				headers: context?.headers ? new Headers(context?.headers) : undefined,
-			};
+				options: endpoint.options,
+			},
+		);
 
-			return runWithEndpointContext(internalContext, () =>
-				(endpoint as any)(internalContext),
-			);
-		};
-		api[key].path = endpoint.path;
-		api[key].options = endpoint.options;
+		(api[key] as any) = wrappedEndpoint;
 	}
-	return api as unknown as E;
+
+	return api;
 }
