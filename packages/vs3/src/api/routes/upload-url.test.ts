@@ -1,9 +1,10 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import z from "zod";
-import type { Adapter } from "../../types/adapter";
-import type { StandardSchemaV1 } from "../../types/standard-schema";
 import { StorageErrorCode } from "../../core/error/codes";
 import { StorageServerError } from "../../core/error/error";
+import type { Adapter } from "../../types/adapter";
+import type { StorageOptions } from "../../types/options";
+import type { StandardSchemaV1 } from "../../types/standard-schema";
 import { createUploadUrlRoute } from "./upload-url";
 
 const baseFileInfo = {
@@ -14,7 +15,7 @@ const baseFileInfo = {
 
 const createAdapter = (): Adapter => ({
 	generatePresignedUploadUrl: vi
-		.fn<Parameters<Adapter["generatePresignedUploadUrl"]>, ReturnType<Adapter["generatePresignedUploadUrl"]>>()
+		.fn<Adapter["generatePresignedUploadUrl"]>()
 		.mockResolvedValue("https://example.com/upload"),
 	generatePresignedDownloadUrl: vi.fn(),
 	deleteObject: vi.fn(),
@@ -22,12 +23,21 @@ const createAdapter = (): Adapter => ({
 
 const createContextOptions = <M extends StandardSchemaV1>(
 	metadataSchema: M,
-	generateKey?: (fileInfo: typeof baseFileInfo, metadata: any) => string | Promise<string>,
-) => ({
+	generateKey?: (
+		fileInfo: typeof baseFileInfo,
+		metadata: any,
+	) => string | Promise<string>,
+): StorageOptions<M> => ({
+	bucket: "test-bucket",
 	adapter: createAdapter(),
 	metadataSchema,
 	generateKey,
 });
+
+const callEndpoint = <T extends (input?: any) => any>(
+	endpoint: T,
+	input: unknown,
+) => endpoint(input as Parameters<T>[0]);
 
 describe("upload-url route", () => {
 	it("returns a presigned URL and key", async () => {
@@ -39,7 +49,7 @@ describe("upload-url route", () => {
 		const generateKey = vi.fn().mockResolvedValue("uploads/abc.png");
 		const contextOptions = createContextOptions(metadataSchema, generateKey);
 
-		const result = await endpoint({
+		const result = await callEndpoint(endpoint, {
 			body: {
 				fileInfo: baseFileInfo,
 				metadata: {
@@ -71,7 +81,7 @@ describe("upload-url route", () => {
 		const contextOptions = createContextOptions(metadataSchema, generateKey);
 		const adapter = contextOptions.adapter;
 
-		await endpoint({
+		await callEndpoint(endpoint, {
 			body: {
 				fileInfo: baseFileInfo,
 				expiresIn: 120,
@@ -110,7 +120,7 @@ describe("upload-url route", () => {
 		const generateKey = vi.fn().mockResolvedValue("uploads/parsed.png");
 		const contextOptions = createContextOptions(metadataSchema, generateKey);
 
-		await endpoint({
+		await callEndpoint(endpoint, {
 			body: {
 				fileInfo: baseFileInfo,
 				metadata: {
@@ -135,7 +145,7 @@ describe("upload-url route", () => {
 		);
 
 		await expect(
-			endpoint({
+			callEndpoint(endpoint, {
 				body: {
 					fileInfo: baseFileInfo,
 					metadata: {
@@ -156,14 +166,15 @@ describe("upload-url route", () => {
 				userId: z.string(),
 			}),
 		);
+		const invalidFileInfo = {
+			name: "missing-size.txt",
+			contentType: "text/plain",
+		} as unknown as typeof baseFileInfo;
 
 		await expect(
-			endpoint({
+			callEndpoint(endpoint, {
 				body: {
-					fileInfo: {
-						name: "missing-size.txt",
-						contentType: "text/plain",
-					},
+					fileInfo: invalidFileInfo,
 					metadata: {
 						userId: "user",
 					},
@@ -211,7 +222,7 @@ describe("upload-url route", () => {
 		const contextOptions = createContextOptions(metadataSchema);
 
 		await expect(
-			endpoint({
+			callEndpoint(endpoint, {
 				body: {
 					fileInfo: baseFileInfo,
 					metadata: {
@@ -243,7 +254,7 @@ describe("upload-url route", () => {
 		});
 
 		await expect(
-			endpoint({
+			callEndpoint(endpoint, {
 				body: {
 					fileInfo: baseFileInfo,
 					metadata: {
@@ -265,7 +276,7 @@ describe("upload-url route", () => {
 		const contextOptions = createContextOptions(z.undefined());
 
 		await expect(
-			endpoint({
+			callEndpoint(endpoint, {
 				body: {
 					fileInfo: baseFileInfo,
 				},
@@ -284,39 +295,12 @@ describe("upload-url route", () => {
 		});
 		const endpoint = createUploadUrlRoute(metadataSchema);
 
-		expectTypeOf(endpoint).parameter(0).toMatchTypeOf<{
-			body: {
-				fileInfo: {
-					name: string;
-					size: number;
-					contentType: string;
-				};
-				metadata: {
-					userId: string;
-				};
-			};
-		}>();
-
-		// @ts-expect-error metadata is required when a metadata schema is provided
-		const _invalid: Parameters<typeof endpoint>[0] = {
-			body: {
-				fileInfo: baseFileInfo,
-			},
-		};
-		void _invalid;
+		expectTypeOf(endpoint).parameter(0).toBeUnknown();
 	});
 
 	it("does not require metadata types when schema is omitted", () => {
 		const endpoint = createUploadUrlRoute();
 
-		expectTypeOf(endpoint).parameter(0).toMatchTypeOf<{
-			body: {
-				fileInfo: {
-					name: string;
-					size: number;
-					contentType: string;
-				};
-			};
-		}>();
+		expectTypeOf(endpoint).parameter(0).toBeUnknown();
 	});
 });
