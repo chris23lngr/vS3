@@ -1,9 +1,15 @@
 import type { Headers } from "./types";
 import { XhrFactory } from "./xhr-factory";
+import {
+	type RetryConfig,
+	DEFAULT_RETRY_CONFIG,
+	calculateRetryDelay,
+	sleep,
+} from "../../core/resilience/retry";
 
 const DEFAULT_RETRY_ATTEMPTS = 3;
 
-type XhrUploadOptions = {
+export type XhrUploadOptions = {
 	/**
 	 * Determines whether to retry the upload if it fails.
 	 *
@@ -40,6 +46,14 @@ type XhrUploadOptions = {
 	 * Callback to be called with the progress of the upload.
 	 */
 	onProgress?: (progress: number) => void;
+
+	/**
+	 * Configuration for retry behavior with exponential backoff and jitter.
+	 * This is used when retry is enabled (retry: true or retry: number).
+	 *
+	 * @default DEFAULT_RETRY_CONFIG - Uses sensible defaults for production use.
+	 */
+	retryConfig?: RetryConfig;
 };
 
 export type XhrUploadResult = {
@@ -56,7 +70,13 @@ export async function xhrUpload(
 	file: File,
 	options?: XhrUploadOptions,
 ): Promise<XhrUploadResult> {
-	const { retry, headers = {}, onProgress, signal } = options ?? {};
+	const {
+		retry,
+		headers = {},
+		onProgress,
+		signal,
+		retryConfig = DEFAULT_RETRY_CONFIG,
+	} = options ?? {};
 
 	let maxAttempts = 1;
 
@@ -128,7 +148,11 @@ export async function xhrUpload(
 				throw error;
 			}
 
-			// Otherwise, continue to the next retry attempt
+			// Calculate delay with exponential backoff and jitter
+			const delayMs = calculateRetryDelay(attempt, retryConfig);
+
+			// Wait before retrying
+			await sleep(delayMs);
 		}
 	}
 
