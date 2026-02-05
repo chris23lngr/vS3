@@ -17,12 +17,14 @@ export const serverErrorSchema = errorSchema.omit({
 });
 
 export class StorageError extends Error {
+	readonly origin: "client" | "server";
 	readonly code: StorageErrorCode;
 	readonly details: unknown;
 
 	constructor(error: z.infer<typeof errorSchema>) {
 		super(error.message);
-		this.name = "sdfsdf";
+		this.name = "StorageError";
+		this.origin = error.origin;
 		this.code = error.code;
 		this.details = error.details;
 	}
@@ -34,6 +36,7 @@ export class StorageClientError extends StorageError {
 			origin: "client" as const,
 			...error,
 		});
+		this.name = "StorageClientError";
 	}
 }
 
@@ -43,5 +46,6 @@ export class StorageServerError extends StorageError {
 			origin: "server" as const,
 			...error,
 		});
+		this.name = "StorageServerError";
 	}
 }
