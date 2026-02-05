@@ -48,6 +48,15 @@ export function toStorageEndpoints<
 		const wrappedEndpoint = Object.assign(
 			async (context: any) => {
 				const storageContext = await ctx;
+
+				// Validate that storageContext has the required $options property
+				if (!storageContext || !storageContext.$options) {
+					throw new Error(
+						"Invalid storage context: $options is missing. This is likely a programming error. " +
+							"Ensure you are using createContext() to create the storage context and passing it to the router.",
+					);
+				}
+
 				const internalContext: InternalContext = {
 					...context,
 					context: {
