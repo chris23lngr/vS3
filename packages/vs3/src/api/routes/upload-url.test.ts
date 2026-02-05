@@ -305,4 +305,83 @@ describe("upload-url route", () => {
 		// @ts-expect-error TODO: Fix this
 		expectTypeOf(endpoint).parameter(0).toBeUnknown();
 	});
+
+	it("rejects request when metadata is required but not provided", async () => {
+		const metadataSchema = z.object({
+			userId: z.string(),
+		});
+
+		const endpoint = createUploadUrlRoute(metadataSchema);
+		const contextOptions = createContextOptions(metadataSchema);
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: undefined,
+				},
+				context: {
+					$options: contextOptions,
+				},
+			}),
+		).rejects.toMatchObject({
+			name: "APIError",
+			statusCode: 400,
+			body: {
+				code: "VALIDATION_ERROR",
+			},
+		});
+	});
+
+	it("rejects request when metadata is required but is null", async () => {
+		const metadataSchema = z.object({
+			userId: z.string(),
+		});
+
+		const endpoint = createUploadUrlRoute(metadataSchema);
+		const contextOptions = createContextOptions(metadataSchema);
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: null,
+				},
+				context: {
+					$options: contextOptions,
+				},
+			}),
+		).rejects.toMatchObject({
+			name: "APIError",
+			statusCode: 400,
+			body: {
+				code: "VALIDATION_ERROR",
+			},
+		});
+	});
+
+	it("allows empty metadata object when all metadata fields are optional", async () => {
+		const metadataSchema = z.object({
+			userId: z.string().optional(),
+		});
+
+		const endpoint = createUploadUrlRoute(metadataSchema);
+		const contextOptions = createContextOptions(metadataSchema);
+
+		// Metadata is required by the registry, but since all fields in the schema
+		// are optional, an empty object {} is valid and should pass validation
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					fileInfo: baseFileInfo,
+					metadata: {},
+				},
+				context: {
+					$options: contextOptions,
+				},
+			}),
+		).resolves.toMatchObject({
+			presignedUrl: "https://example.com/upload",
+		});
+	});
 });

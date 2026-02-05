@@ -100,6 +100,15 @@ export function standardSchemaToZod<S extends StandardSchemaV1>(
 /**
  * Extend a Zod object schema with a `metadata` field validated by StandardSchemaV1.
  * The resulting schema preserves the original structure and types.
+ *
+ * @param zodSchema - The base Zod schema to extend
+ * @param standardSchema - The StandardSchemaV1 to validate metadata
+ * @param required - Whether metadata is required (default: true)
+ *
+ * @remarks
+ * Note: The return type always shows metadata as required in TypeScript types,
+ * even when `required` is false. This is a known limitation. At runtime, metadata
+ * will be optional when `required` is false, but TypeScript types won't reflect this.
  */
 export function mergeSchema<
 	Z extends z.ZodObject<z.ZodRawShape>,
@@ -107,14 +116,17 @@ export function mergeSchema<
 >(
 	zodSchema: Z,
 	standardSchema: S,
+	required: boolean = true,
 ): z.ZodType<WithMetadataOutput<Z, S>, WithMetadataInput<Z, S>> {
 	const metadataSchema = standardSchemaToZod(standardSchema);
+	const metadataField = required ? metadataSchema : metadataSchema.optional();
+
 	const merged = zodSchema
 		.extend({
-			metadata: metadataSchema,
+			metadata: metadataField,
 		})
 		.superRefine((value, ctx) => {
-			if (value.metadata === undefined) {
+			if (required && (value.metadata === undefined || value.metadata === null)) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
 					message: "Required",

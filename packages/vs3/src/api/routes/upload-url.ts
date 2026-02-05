@@ -16,6 +16,7 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 		{
 			method: "POST",
 			metadataSchema: metadataSchema ?? z.undefined(),
+			requireMetadata: schemas.requireMetadata,
 			body: schemas.body,
 			outputSchema: schemas.output,
 		},
