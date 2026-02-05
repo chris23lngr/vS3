@@ -23,14 +23,18 @@ function shouldSkipMiddleware(config: MiddlewareConfig, path: string): boolean {
 /**
  * Merges an existing context with new values from a middleware result.
  */
-function mergeContext<T extends object>(
+function mergeContext<T extends Record<string, unknown>>(
 	existing: T,
-	addition: object | undefined,
+	addition: Record<string, unknown> | undefined,
 ): T {
 	if (!addition) {
 		return existing;
 	}
-	return { ...existing, ...addition } as T;
+	return { ...existing, ...addition };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -81,7 +85,9 @@ export async function executeMiddlewareChain(
 	middlewares: readonly StorageMiddleware[],
 	initialContext: StorageMiddlewareContext,
 ): Promise<ChainExecutionResult> {
-	let accumulatedContext = { ...initialContext.context };
+	let accumulatedContext: Record<string, unknown> = {
+		...initialContext.context,
+	};
 
 	for (const middleware of middlewares) {
 		if (shouldSkipMiddleware(middleware.config, initialContext.path)) {
@@ -94,6 +100,12 @@ export async function executeMiddlewareChain(
 		};
 
 		const result = await executeSingleMiddleware(middleware, ctx);
+		if (result !== undefined && !isRecord(result)) {
+			throw createMiddlewareError(
+				middleware.config.name,
+				new Error("Middleware result must be a plain object"),
+			);
+		}
 		accumulatedContext = mergeContext(accumulatedContext, result);
 	}
 

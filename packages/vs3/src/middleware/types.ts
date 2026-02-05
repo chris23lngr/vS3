@@ -17,7 +17,10 @@ export type StorageMiddlewareContext<C = object> = {
  * Returns a context object to merge into the accumulated context,
  * or undefined if the middleware does not contribute context.
  */
-export type MiddlewareHandler<TContext = object, TResult = object> = (
+export type MiddlewareHandler<
+	TContext = object,
+	TResult extends Record<string, unknown> = Record<string, unknown>,
+> = (
 	ctx: StorageMiddlewareContext<TContext>,
 ) => Promise<TResult | undefined>;
 
@@ -37,7 +40,10 @@ export type MiddlewareConfig = {
 /**
  * Complete middleware definition combining config and handler.
  */
-export type StorageMiddleware<TContext = object, TResult = object> = {
+export type StorageMiddleware<
+	TContext = object,
+	TResult extends Record<string, unknown> = Record<string, unknown>,
+> = {
 	readonly config: MiddlewareConfig;
 	readonly handler: MiddlewareHandler<TContext, TResult>;
 };
