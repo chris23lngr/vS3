@@ -1,3 +1,8 @@
+---
+title: S3 Encryption Options
+description: Add S3 server-side encryption to your storage by passing encryption options when you create the storage.
+---
+
 # S3 Encryption Options
 
 vs3 supports S3 server-side encryption when generating presigned upload URLs.

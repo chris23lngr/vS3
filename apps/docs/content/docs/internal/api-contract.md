@@ -1,3 +1,8 @@
+---
+title: API Contract
+description: This document defines the public API surface, error/response contracts, and stability guarantees for VS3.
+---
+
 # VS3 API Contract
 
 This document defines the **public API surface**, **error/response contracts**, and **stability guarantees** for VS3.

@@ -1,3 +1,8 @@
+---
+title: Versioning & Stability Policy
+description: This document defines the versioning and stability policy for VS3.
+---
+
 # VS3 Versioning & Stability Policy
 
 VS3 follows **Semantic Versioning (SemVer)**: `MAJOR.MINOR.PATCH`.
