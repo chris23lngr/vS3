@@ -10,6 +10,8 @@ export function extractFileName(key: string): string {
 /**
  * Fetches the file via the presigned URL, creates a Blob + object URL,
  * and triggers a browser download using an anchor element.
+ *
+ * @throws {Error} When the fetch response indicates a non-ok status.
  */
 export async function triggerBrowserDownload(
 	presignedUrl: string,
@@ -20,17 +22,24 @@ export async function triggerBrowserDownload(
 		headers: downloadHeaders,
 	});
 
+	if (!response.ok) {
+		throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+	}
+
 	const blob = await response.blob();
 	const objectUrl = URL.createObjectURL(blob);
 
-	const anchor = document.createElement("a");
-	anchor.href = objectUrl;
-	anchor.download = fileName;
-	anchor.style.display = "none";
-	document.body.appendChild(anchor);
-	anchor.click();
-	document.body.removeChild(anchor);
-	URL.revokeObjectURL(objectUrl);
+	try {
+		const anchor = document.createElement("a");
+		anchor.href = objectUrl;
+		anchor.download = fileName;
+		anchor.style.display = "none";
+		document.body.appendChild(anchor);
+		anchor.click();
+		document.body.removeChild(anchor);
+	} finally {
+		URL.revokeObjectURL(objectUrl);
+	}
 }
 
 /**

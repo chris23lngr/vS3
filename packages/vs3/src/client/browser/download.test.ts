@@ -41,6 +41,7 @@ describe("triggerBrowserDownload", () => {
 		vi.stubGlobal(
 			"fetch",
 			vi.fn().mockResolvedValue({
+				ok: true,
 				blob: vi.fn().mockResolvedValue(new Blob(["file content"])),
 			}),
 		);
@@ -72,6 +73,37 @@ describe("triggerBrowserDownload", () => {
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+	});
+
+	it("throws when fetch response is not ok", async () => {
+		(fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+			ok: false,
+			status: 403,
+			statusText: "Forbidden",
+		});
+
+		await expect(
+			triggerBrowserDownload("https://s3.example.com/file", "photo.png"),
+		).rejects.toThrow("Download failed: 403 Forbidden");
+
+		expect(URL.createObjectURL).not.toHaveBeenCalled();
+	});
+
+	it("revokes object URL even when DOM operations fail", async () => {
+		appendChildSpy.mockImplementation(() => {
+			throw new Error("DOM error");
+		});
+
+		(fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+			ok: true,
+			blob: vi.fn().mockResolvedValue(new Blob(["content"])),
+		});
+
+		await expect(
+			triggerBrowserDownload("https://s3.example.com/file", "photo.png"),
+		).rejects.toThrow("DOM error");
+
+		expect(URL.revokeObjectURL).toHaveBeenCalledWith(mockObjectUrl);
 	});
 
 	it("fetches the presigned URL and triggers anchor click", async () => {
