@@ -41,7 +41,7 @@ type UploadValidationResult = {
 const uploadUrlResponseSchema = z.object({
 	key: z.string(),
 	presignedUrl: z.string(),
-	uploadHeaders: z.record(z.string()).optional(),
+	uploadHeaders: z.record(z.string(), z.string()).optional(),
 });
 
 function createClientValidationError(

@@ -24,7 +24,7 @@ export const routeRegistry = {
 		output: z.object({
 			presignedUrl: z.string(),
 			key: z.string(),
-			uploadHeaders: z.record(z.string()).optional(),
+			uploadHeaders: z.record(z.string(), z.string()).optional(),
 		}),
 	},
 } as const satisfies RouteRegistry;
