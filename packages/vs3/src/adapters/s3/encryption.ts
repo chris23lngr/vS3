@@ -54,11 +54,8 @@ function buildSseCConfig(encryption: Extract<S3Encryption, { type: "SSE-C" }>) {
 	const headers: S3EncryptionHeaders = {
 		[SSE_C_ALGORITHM_HEADER]: algorithm,
 		[SSE_C_KEY_HEADER]: encryption.customerKey,
+		[SSE_C_KEY_MD5_HEADER]: encryption.customerKeyMd5,
 	};
-
-	if (encryption.customerKeyMd5) {
-		headers[SSE_C_KEY_MD5_HEADER] = encryption.customerKeyMd5;
-	}
 
 	return {
 		headers,

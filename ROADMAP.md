@@ -367,7 +367,7 @@
 
 #### 2.2 Anti-Abuse Controls
 
-- [ ] 2.2.1 **Rate Limiting**
+- [x] 2.2.1 **Rate Limiting**
   - Add rate limiting middleware
   - Add rate limiting hooks or middleware integration points
   - Support multiple strategies (IP, user ID, API key)
@@ -377,7 +377,7 @@
   - **Files:** `src/middleware/rate-limit.ts`, `src/adapters/rate-limit/*`
   - **Estimated Time:** 6 hours
 
-- [ ] 2.2.2 **Request Signing & Verification**
+- [x] 2.2.2 **Request Signing & Verification**
   - Add HMAC request signing for API calls
   - Add signature verification middleware
   - Add timestamp validation to prevent replay attacks
@@ -386,7 +386,7 @@
   - **Files:** `src/core/security/request-signer.ts`, `src/middleware/verify-signature.ts`
   - **Estimated Time:** 5 hours
 
-- [ ] 2.2.3 **CORS Configuration**
+- [x] 2.2.3 **CORS Configuration**
   - Add configurable CORS middleware
   - Support allowlist/blocklist
   - Add preflight handling

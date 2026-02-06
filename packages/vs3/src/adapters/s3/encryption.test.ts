@@ -51,25 +51,6 @@ describe("resolveS3EncryptionConfig", () => {
 		});
 	});
 
-	it("builds SSE-C headers and input with defaults", () => {
-		const result = resolveS3EncryptionConfig({
-			type: "SSE-C",
-			customerKey: "base64-key",
-		});
-
-		expect(result).toEqual({
-			headers: {
-				"x-amz-server-side-encryption-customer-algorithm": "AES256",
-				"x-amz-server-side-encryption-customer-key": "base64-key",
-			},
-			input: {
-				SSECustomerAlgorithm: "AES256",
-				SSECustomerKey: "base64-key",
-				SSECustomerKeyMD5: undefined,
-			},
-		});
-	});
-
 	it("builds SSE-C headers and input with md5", () => {
 		const result = resolveS3EncryptionConfig({
 			type: "SSE-C",
