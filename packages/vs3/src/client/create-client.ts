@@ -473,6 +473,7 @@ export function createBaseClient<
 
 	return {
 		$fetch,
+		"~options": options,
 		/**
 		 * Uploads a file to storage using a presigned URL.
 		 *

@@ -148,9 +148,14 @@ function useUploadInternal<M extends StandardSchemaV1>(
 	const { onProgress, onSuccess, onError, throwOnError = false } = options ?? {};
 	const { state, actions } = useUploadState();
 
+	const shouldThrow =
+		throwOnError !== undefined
+			? throwOnError
+			: client["~options"].throwOnError === true;
+
 	const upload = useUploadHandler(
 		client,
-		{ onProgress, onSuccess, onError, throwOnError },
+		{ onProgress, onSuccess, onError, throwOnError: shouldThrow },
 		actions,
 	);
 

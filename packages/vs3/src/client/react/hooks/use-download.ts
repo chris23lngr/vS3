@@ -151,9 +151,14 @@ function useDownloadInternal<M extends StandardSchemaV1>(
 	const { onSuccess, onError, throwOnError = false } = options ?? {};
 	const { state, actions } = useDownloadState();
 
+	const shouldThrow =
+		throwOnError !== undefined
+			? throwOnError
+			: client["~options"].throwOnError === true;
+
 	const download = useDownloadHandler(
 		client,
-		{ onSuccess, onError, throwOnError },
+		{ onSuccess, onError, throwOnError: shouldThrow },
 		actions,
 	);
 
