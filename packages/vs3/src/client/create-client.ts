@@ -16,6 +16,7 @@ import {
 	getMagicByteLength,
 } from "../core/validation/file-validator";
 import type { FileInfo } from "../types/file";
+import type { S3Encryption } from "../types/encryption";
 import type { StandardSchemaV1 } from "../types/standard-schema";
 import { createFetchSchema } from "./fetch-schema";
 import type { StorageClientOptions } from "./types";
@@ -40,6 +41,7 @@ type UploadValidationResult = {
 const uploadUrlResponseSchema = z.object({
 	key: z.string(),
 	presignedUrl: z.string(),
+	uploadHeaders: z.record(z.string(), z.string()).optional(),
 });
 
 function createClientValidationError(
@@ -151,13 +153,16 @@ async function executeUploadRequest<M extends StandardSchemaV1>(
 	file: File,
 	fileInfo: FileInfo,
 	metadata: StandardSchemaV1.InferInput<M>,
-	onProgress?: (progress: number) => void,
+	encryption: S3Encryption | undefined,
+	onProgress: ((progress: number) => void) | undefined,
+	retry: undefined | true | number,
 ): Promise<UploadFileResult> {
+	const body = encryption
+		? { fileInfo, metadata, encryption }
+		: { fileInfo, metadata };
+
 	const response = await $fetch("/upload-url", {
-		body: {
-			fileInfo,
-			metadata,
-		},
+		body,
 	});
 
 	if (response.error) {
@@ -177,18 +182,26 @@ async function executeUploadRequest<M extends StandardSchemaV1>(
 		});
 	}
 
-	const { key, presignedUrl } = parsedResponse.data;
+	const { key, presignedUrl, uploadHeaders } = parsedResponse.data;
 	const uploadResult = await xhrUpload(presignedUrl, file, {
 		onProgress,
+		retry,
+		headers: uploadHeaders ?? {},
 	});
 
-	return {
+	const result: UploadFileResult = {
 		key,
 		presignedUrl,
 		uploadUrl: uploadResult.uploadUrl,
 		status: uploadResult.status,
 		statusText: uploadResult.statusText,
 	};
+
+	if (uploadHeaders && Object.keys(uploadHeaders).length > 0) {
+		result.uploadHeaders = uploadHeaders;
+	}
+
+	return result;
 }
 
 function handleUploadError(
@@ -281,6 +294,8 @@ export type UploadFileResult = {
 	status: number;
 	/** HTTP status text from the upload operation */
 	statusText: string;
+	/** Headers applied to the upload request, if any */
+	uploadHeaders?: Record<string, string>;
 };
 
 type ClientFnOptions = {
@@ -335,10 +350,11 @@ export function createBaseClient<
 					retry?: undefined | true | number;
 					onProgress?: (progress: number) => void;
 					abort: () => void;
+					encryption?: S3Encryption;
 				}
 			>,
 		): Promise<UploadFileResult> => {
-			const { onError, onSuccess, onProgress } = options ?? {};
+			const { onError, onSuccess, onProgress, encryption, retry } = options ?? {};
 			const { fileInfo } = await validateUploadFileInput({
 				file,
 				maxFileSize,
@@ -352,7 +368,9 @@ export function createBaseClient<
 					file,
 					fileInfo,
 					metadata,
+					encryption,
 					onProgress,
+					retry,
 				);
 				onSuccess?.(result);
 				return result;

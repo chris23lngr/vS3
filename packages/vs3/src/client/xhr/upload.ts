@@ -76,6 +76,14 @@ type RetryExecutionParams = {
 	execute: () => Promise<XhrUploadResult>;
 };
 
+function normalizeHeaders(headers: Headers): Headers {
+	const normalized: Headers = {};
+	for (const [key, value] of Object.entries(headers)) {
+		normalized[key.toLowerCase()] = value;
+	}
+	return normalized;
+}
+
 function resolveMaxAttempts(retry?: undefined | true | number): number {
 	if (typeof retry === "number") {
 		return Math.max(1, retry);
@@ -140,7 +148,7 @@ function createUploadRequest({
 }: UploadRequestParams): Promise<XhrUploadResult> {
 	return new Promise((resolve, reject) => {
 		const xhr = new XhrFactory(signal);
-		const requestHeaders = { ...headers };
+		const requestHeaders = normalizeHeaders(headers);
 		xhr.open("PUT", url, true);
 		if (file.type && !requestHeaders["content-type"]) {
 			requestHeaders["content-type"] = file.type;

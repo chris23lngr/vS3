@@ -6,6 +6,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Adapter } from "../../types/adapter";
+import { resolveS3EncryptionConfig } from "../s3/encryption";
 
 interface CreateAwsS3AdapterOptions {
 	client: S3Client;
@@ -33,6 +34,7 @@ export function createAwsS3Adapter(
 				metadata = {},
 				contentType,
 				bucket,
+				encryption,
 			} = requestOptions ?? {};
 
 			const resolvedContentType =
@@ -46,6 +48,7 @@ export function createAwsS3Adapter(
 				([, value]) => value !== undefined,
 			);
 
+			const encryptionConfig = resolveS3EncryptionConfig(encryption);
 			const command = new PutObjectCommand({
 				Bucket: resolveBucket(bucket),
 				Key: key,
@@ -54,17 +57,35 @@ export function createAwsS3Adapter(
 				Metadata: metadataEntries.length
 					? Object.fromEntries(metadataEntries)
 					: undefined,
+				...(encryptionConfig.input ?? {}),
 			});
 
-			return getSignedUrl(options.client, command, { expiresIn });
+			const url = await getSignedUrl(options.client, command, { expiresIn });
+
+			if (encryptionConfig.headers) {
+				return { url, headers: encryptionConfig.headers };
+			}
+
+			return url;
 		},
 		async generatePresignedDownloadUrl(key, requestOptions) {
-			const { expiresIn = 3600, bucket } = requestOptions ?? {};
+			const { expiresIn = 3600, bucket, encryption } = requestOptions ?? {};
+			const encryptionConfig =
+				encryption?.type === "SSE-C"
+					? resolveS3EncryptionConfig(encryption)
+					: {};
 			const command = new GetObjectCommand({
 				Bucket: resolveBucket(bucket),
 				Key: key,
+				...(encryptionConfig.input ?? {}),
 			});
-			return getSignedUrl(options.client, command, { expiresIn });
+			const url = await getSignedUrl(options.client, command, { expiresIn });
+
+			if (encryptionConfig.headers) {
+				return { url, headers: encryptionConfig.headers };
+			}
+
+			return url;
 		},
 		async deleteObject(key, requestOptions) {
 			const { bucket } = requestOptions ?? {};

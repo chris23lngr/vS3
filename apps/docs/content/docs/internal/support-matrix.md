@@ -1,3 +1,8 @@
+---
+title: Support Matrix
+description: This document defines the explicit support targets for VS3.
+---
+
 # VS3 Support Matrix
 
 This document defines the explicit support targets for VS3. These are **targets** for compatibility and testing, not a guarantee that every feature works identically across every environment.
