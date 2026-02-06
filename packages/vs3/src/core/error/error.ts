@@ -28,13 +28,19 @@ export class StorageError extends Error {
 	constructor(error: z.infer<typeof errorSchema>) {
 		super(error.message);
 		const definition = getStorageErrorDefinition(error.code);
+		const fallbackDefinition = getStorageErrorDefinition(
+			StorageErrorCode.UNKNOWN_ERROR,
+		);
+		const resolvedDefinition = definition ?? fallbackDefinition;
+		const resolvedCode =
+			definition === undefined ? StorageErrorCode.UNKNOWN_ERROR : error.code;
 		this.name = "StorageError";
 		this.origin = error.origin;
-		this.code = error.code;
+		this.code = resolvedCode;
 		this.details = error.details;
-		this.httpStatus = error.httpStatus ?? definition.httpStatus;
+		this.httpStatus = error.httpStatus ?? resolvedDefinition.httpStatus;
 		this.recoverySuggestion =
-			error.recoverySuggestion ?? definition.recoverySuggestion;
+			error.recoverySuggestion ?? resolvedDefinition.recoverySuggestion;
 	}
 
 	toPayload(): StorageErrorPayload {

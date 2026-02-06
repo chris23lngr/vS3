@@ -102,8 +102,11 @@ When VS3 surfaces structured errors, they follow this shape:
 - `origin` indicates where the error was created.
 - `code` is a stable error identifier (see below).
 - `details` may include validation issues or context; it is **not** a stable schema.
-- `httpStatus` maps the error to an HTTP status code.
-- `recoverySuggestion` provides a recommended recovery action for clients.
+- `httpStatus` maps the error to an HTTP status code. If omitted when constructing
+  an error, it is populated from the error definitions before serialization.
+- `recoverySuggestion` provides a recommended recovery action for clients. If omitted
+  when constructing an error, it is populated from the error definitions before
+  serialization.
 
 ### Error Codes (Versioned)
 
