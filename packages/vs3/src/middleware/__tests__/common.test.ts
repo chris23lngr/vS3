@@ -635,7 +635,7 @@ describe("createLoggingMiddleware logs for included paths", () => {
 // Timeout
 // ---------------------------------------------------------------------------
 
-	describe("createTimeoutMiddleware returns AbortSignal", () => {
+describe("createTimeoutMiddleware returns AbortSignal", () => {
 	it("returns AbortSignal in context", async () => {
 		const middleware = createTimeoutMiddleware({ timeoutMs: 5_000 });
 
@@ -650,7 +650,7 @@ describe("createLoggingMiddleware logs for included paths", () => {
 	});
 });
 
-	describe("createTimeoutMiddleware signal aborts after timeout", () => {
+describe("createTimeoutMiddleware signal aborts after timeout", () => {
 	it("aborts signal after configured timeout", async () => {
 		const middleware = createTimeoutMiddleware({ timeoutMs: 10 });
 
