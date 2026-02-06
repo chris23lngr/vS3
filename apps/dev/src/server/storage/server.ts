@@ -40,6 +40,7 @@ export const storage = createStorage({
 	bucket: "spesen-tool-dev1",
 	apiPath: "/api/storage",
 	adapter: aws({
+		bucket: "spesen-tool-dev1",
 		client: getS3Client(),
 	}),
 	metadataSchema: z.object({
