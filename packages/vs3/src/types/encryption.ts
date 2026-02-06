@@ -30,7 +30,7 @@ export type S3Encryption =
 			/**
 			 * Base64-encoded MD5 digest of the customer key.
 			 */
-			customerKeyMd5: string;
+			customerKeyMd5?: string;
 			/**
 			 * Encryption algorithm. Only AES256 is supported by S3.
 			 */

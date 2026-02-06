@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import type { S3Encryption } from "../../types/encryption";
 
 export type S3EncryptionHeaders = Record<string, string>;
@@ -49,12 +50,36 @@ function buildSseKmsConfig(keyId?: string): S3EncryptionConfig {
 	};
 }
 
+function resolveCustomerKeyMd5(
+	customerKey: string,
+	customerKeyMd5: string | undefined,
+): string {
+	if (customerKeyMd5 && customerKeyMd5.trim().length > 0) {
+		return customerKeyMd5;
+	}
+
+	try {
+		return createHash("md5")
+			.update(Buffer.from(customerKey, "base64"))
+			.digest("base64");
+	} catch (error) {
+		throw new Error(
+			"Invalid base64 customer key for SSE-C encryption; unable to compute MD5.",
+			{ cause: error },
+		);
+	}
+}
+
 function buildSseCConfig(encryption: Extract<S3Encryption, { type: "SSE-C" }>) {
 	const algorithm = encryption.algorithm ?? "AES256";
+	const customerKeyMd5 = resolveCustomerKeyMd5(
+		encryption.customerKey,
+		encryption.customerKeyMd5,
+	);
 	const headers: S3EncryptionHeaders = {
 		[SSE_C_ALGORITHM_HEADER]: algorithm,
 		[SSE_C_KEY_HEADER]: encryption.customerKey,
-		[SSE_C_KEY_MD5_HEADER]: encryption.customerKeyMd5,
+		[SSE_C_KEY_MD5_HEADER]: customerKeyMd5,
 	};
 
 	return {
@@ -62,7 +87,7 @@ function buildSseCConfig(encryption: Extract<S3Encryption, { type: "SSE-C" }>) {
 		input: {
 			SSECustomerAlgorithm: algorithm,
 			SSECustomerKey: encryption.customerKey,
-			SSECustomerKeyMD5: encryption.customerKeyMd5,
+			SSECustomerKeyMD5: customerKeyMd5,
 		},
 	};
 }

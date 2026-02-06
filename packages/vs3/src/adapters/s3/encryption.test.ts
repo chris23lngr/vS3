@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { describe, expect, it } from "vitest";
 import { resolveS3EncryptionConfig } from "./encryption";
 
@@ -51,7 +52,31 @@ describe("resolveS3EncryptionConfig", () => {
 		});
 	});
 
-	it("builds SSE-C headers and input with md5", () => {
+	it("builds SSE-C headers and input with auto-generated md5", () => {
+		const customerKey = "base64-key";
+		const expectedMd5 = createHash("md5")
+			.update(Buffer.from(customerKey, "base64"))
+			.digest("base64");
+		const result = resolveS3EncryptionConfig({
+			type: "SSE-C",
+			customerKey,
+		});
+
+		expect(result).toEqual({
+			headers: {
+				"x-amz-server-side-encryption-customer-algorithm": "AES256",
+				"x-amz-server-side-encryption-customer-key": customerKey,
+				"x-amz-server-side-encryption-customer-key-MD5": expectedMd5,
+			},
+			input: {
+				SSECustomerAlgorithm: "AES256",
+				SSECustomerKey: customerKey,
+				SSECustomerKeyMD5: expectedMd5,
+			},
+		});
+	});
+
+	it("builds SSE-C headers and input with provided md5", () => {
 		const result = resolveS3EncryptionConfig({
 			type: "SSE-C",
 			customerKey: "base64-key",
