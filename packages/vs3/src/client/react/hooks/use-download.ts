@@ -29,6 +29,14 @@ type DownloadCallbacks = {
 	throwOnError: boolean;
 };
 
+type DownloadExecution<M extends StandardSchemaV1> = {
+	client: BaseStorageClient<M>;
+	key: string;
+	downloadOptions?: DownloadOptions;
+	actions: DownloadStateActions;
+	callbacks: DownloadCallbacks;
+};
+
 type DownloadOptions = Partial<{
 	expiresIn: number;
 	encryption: S3Encryption;
@@ -50,7 +58,7 @@ type UseDownloadReturn = {
 	reset: () => void;
 };
 
-type UseDownloadHook<M extends StandardSchemaV1> = (
+type UseDownloadHook = (
 	options?: Partial<UseDownloadOptions>,
 ) => UseDownloadReturn;
 
@@ -86,6 +94,31 @@ function useDownloadState(): {
 	return { state, actions: { reset, setLoading, setSuccess, setFailure } };
 }
 
+async function executeDownload<M extends StandardSchemaV1>(
+	input: DownloadExecution<M>,
+): Promise<DownloadFileResult | undefined> {
+	const { client, key, downloadOptions, actions, callbacks } = input;
+	try {
+		actions.reset();
+		actions.setLoading();
+		const result = await client.downloadFile(key, {
+			...downloadOptions,
+			onSuccess: (value) => {
+				actions.setSuccess(value);
+				callbacks.onSuccess?.(value);
+			},
+		});
+		return result;
+	} catch (error) {
+		actions.setFailure(error);
+		callbacks.onError?.(error);
+		if (callbacks.throwOnError) {
+			throw error;
+		}
+		return undefined;
+	}
+}
+
 function useDownloadHandler<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 	callbacks: DownloadCallbacks,
@@ -94,43 +127,20 @@ function useDownloadHandler<M extends StandardSchemaV1>(
 	key: string,
 	downloadOptions?: DownloadOptions,
 ) => Promise<DownloadFileResult | undefined> {
-	const { reset, setLoading, setSuccess, setFailure } = actions;
-	const { onSuccess, onError, throwOnError } = callbacks;
 	return useCallback(
 		async (
 			key: string,
 			downloadOptions?: DownloadOptions,
 		): Promise<DownloadFileResult | undefined> => {
-			try {
-				reset();
-				setLoading();
-				const result = await client.downloadFile(key, {
-					...downloadOptions,
-					onSuccess: (value) => {
-						setSuccess(value);
-						onSuccess?.(value);
-					},
-				});
-				return result;
-			} catch (error) {
-				setFailure(error);
-				onError?.(error);
-				if (throwOnError) {
-					throw error;
-				}
-				return undefined;
-			}
+			return executeDownload({
+				client,
+				key,
+				downloadOptions,
+				actions,
+				callbacks,
+			});
 		},
-		[
-			client,
-			reset,
-			setLoading,
-			setSuccess,
-			setFailure,
-			onSuccess,
-			onError,
-			throwOnError,
-		],
+		[client, actions, callbacks],
 	);
 }
 
@@ -152,7 +162,7 @@ function useDownloadInternal<M extends StandardSchemaV1>(
 
 export function createUseDownload<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
-): UseDownloadHook<M> {
+): UseDownloadHook {
 	return function useDownload(
 		options?: Partial<UseDownloadOptions>,
 	): UseDownloadReturn {

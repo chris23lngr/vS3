@@ -27,6 +27,14 @@ type UploadCallbacks = {
 	throwOnError: boolean;
 };
 
+type UploadExecution<M extends StandardSchemaV1> = {
+	client: BaseStorageClient<M>;
+	file: File;
+	metadata: StandardSchemaV1.InferInput<M>;
+	actions: UploadStateActions;
+	callbacks: UploadCallbacks;
+};
+
 export interface UseUploadOptions {
 	onProgress: (progress: number) => void;
 	onSuccess: () => void;
@@ -84,52 +92,52 @@ function useUploadState(): { state: UploadState; actions: UploadStateActions } {
 	};
 }
 
+async function executeUpload<M extends StandardSchemaV1>(
+	input: UploadExecution<M>,
+): Promise<void> {
+	const { client, file, metadata, actions, callbacks } = input;
+	try {
+		actions.reset();
+		actions.setLoading();
+		const result = await client.uploadFile(file, metadata, {
+			onProgress: (value) => {
+				actions.setProgress(value);
+				callbacks.onProgress?.(value);
+			},
+			onSuccess: ({ key, presignedUrl }) => {
+				actions.setSuccess({ key, presignedUrl });
+				callbacks.onSuccess?.();
+			},
+		});
+		actions.setSuccess(result);
+	} catch (error) {
+		actions.setFailure(error);
+		callbacks.onError?.(error);
+		if (callbacks.throwOnError) {
+			throw error;
+		}
+	}
+}
+
 function useUploadHandler<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 	callbacks: UploadCallbacks,
 	actions: UploadStateActions,
 ): (file: File, metadata: StandardSchemaV1.InferInput<M>) => Promise<void> {
-	const { reset, setLoading, setProgress, setSuccess, setFailure } = actions;
-	const { onProgress, onSuccess, onError, throwOnError } = callbacks;
 	return useCallback(
 		async (
 			file: File,
 			metadata: StandardSchemaV1.InferInput<M>,
 		): Promise<void> => {
-			try {
-				reset();
-				setLoading();
-				const result = await client.uploadFile(file, metadata, {
-					onProgress: (value) => {
-						setProgress(value);
-						onProgress?.(value);
-					},
-					onSuccess: ({ key, presignedUrl }) => {
-						setSuccess({ key, presignedUrl });
-						onSuccess?.();
-					},
-				});
-				setSuccess(result);
-			} catch (error) {
-				setFailure(error);
-				onError?.(error);
-				if (throwOnError) {
-					throw error;
-				}
-			}
+			await executeUpload({
+				client,
+				file,
+				metadata,
+				actions,
+				callbacks,
+			});
 		},
-		[
-			client,
-			reset,
-			setLoading,
-			setProgress,
-			setSuccess,
-			setFailure,
-			onProgress,
-			onSuccess,
-			onError,
-			throwOnError,
-		],
+		[client, actions, callbacks],
 	);
 }
 
