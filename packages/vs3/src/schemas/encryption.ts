@@ -12,7 +12,7 @@ function isValidSseCustomerKey(value: string): boolean {
 		return false;
 	}
 
-	return value.endsWith("==");
+	return value.endsWith("=") && !value.endsWith("==");
 }
 
 export const s3EncryptionSchema = z.discriminatedUnion("type", [
