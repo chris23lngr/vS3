@@ -1,14 +1,16 @@
 import { useCallback, useState } from "react";
+import type { StorageError } from "../../../core/error/error";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
-import type { BaseStorageClient } from "../../create-client";
+import type { BaseStorageClient, UploadFileResult } from "../../create-client";
+import { normalizeStorageError } from "./storage-error";
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
 
 type UploadState = {
 	isLoading: boolean;
 	progress: number;
-	error: unknown;
-	data: unknown;
+	error: StorageError | null;
+	data: UploadFileResult | null;
 	status: UploadStatus;
 };
 
@@ -16,14 +18,14 @@ type UploadStateActions = {
 	reset: () => void;
 	setLoading: () => void;
 	setProgress: (value: number) => void;
-	setSuccess: (value: unknown) => void;
-	setFailure: (value: unknown) => void;
+	setSuccess: (value: UploadFileResult) => void;
+	setFailure: (value: StorageError) => void;
 };
 
 type UploadCallbacks = {
 	onProgress?: (progress: number) => void;
-	onSuccess?: () => void;
-	onError?: (error: unknown) => void;
+	onSuccess?: (result: UploadFileResult) => void;
+	onError?: (error: StorageError) => void;
 	throwOnError: boolean;
 };
 
@@ -37,8 +39,8 @@ type UploadExecution<M extends StandardSchemaV1> = {
 
 export interface UseUploadOptions {
 	onProgress: (progress: number) => void;
-	onSuccess: () => void;
-	onError: (error: unknown) => void;
+	onSuccess: (result: UploadFileResult) => void;
+	onError: (error: StorageError) => void;
 	throwOnError?: boolean;
 }
 
@@ -67,7 +69,7 @@ function useUploadState(): { state: UploadState; actions: UploadStateActions } {
 	const [state, setState] = useState<UploadState>(initialUploadState);
 
 	const reset = useCallback((): void => {
-		setState({ ...initialUploadState, error: undefined, data: undefined });
+		setState(initialUploadState);
 	}, []);
 
 	const setLoading = useCallback((): void => {
@@ -78,11 +80,11 @@ function useUploadState(): { state: UploadState; actions: UploadStateActions } {
 		setState((current) => ({ ...current, progress: value }));
 	}, []);
 
-	const setSuccess = useCallback((value: unknown): void => {
+	const setSuccess = useCallback((value: UploadFileResult): void => {
 		setState((current) => ({ ...current, data: value, status: "success" }));
 	}, []);
 
-	const setFailure = useCallback((value: unknown): void => {
+	const setFailure = useCallback((value: StorageError): void => {
 		setState((current) => ({ ...current, error: value, status: "error" }));
 	}, []);
 
@@ -104,17 +106,18 @@ async function executeUpload<M extends StandardSchemaV1>(
 				actions.setProgress(value);
 				callbacks.onProgress?.(value);
 			},
-			onSuccess: ({ key, presignedUrl }) => {
-				actions.setSuccess({ key, presignedUrl });
-				callbacks.onSuccess?.();
-			},
 		});
 		actions.setSuccess(result);
+		callbacks.onSuccess?.(result);
 	} catch (error) {
-		actions.setFailure(error);
-		callbacks.onError?.(error);
+		const storageError = normalizeStorageError(
+			error,
+			"Upload failed unexpectedly",
+		);
+		actions.setFailure(storageError);
+		callbacks.onError?.(storageError);
 		if (callbacks.throwOnError) {
-			throw error;
+			throw storageError;
 		}
 	}
 }
