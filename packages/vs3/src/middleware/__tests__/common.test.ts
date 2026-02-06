@@ -30,6 +30,44 @@ function createTestContext(
 	};
 }
 
+function assertIsResponse(value: unknown): asserts value is Response {
+	if (!(value instanceof Response)) {
+		throw new Error("Expected Response");
+	}
+}
+
+function assertIsStorageServerError(
+	value: unknown,
+): asserts value is StorageServerError {
+	if (!(value instanceof StorageServerError)) {
+		throw new Error("Expected StorageServerError");
+	}
+}
+
+function hasTimeoutContext(
+	value: unknown,
+): value is { timeout: { signal: AbortSignal } } {
+	if (typeof value !== "object" || value === null) {
+		return false;
+	}
+
+	const timeoutValue = Reflect.get(value, "timeout");
+	if (typeof timeoutValue !== "object" || timeoutValue === null) {
+		return false;
+	}
+
+	const signalValue = Reflect.get(timeoutValue, "signal");
+	return signalValue instanceof AbortSignal;
+}
+
+function assertHasTimeoutContext(
+	value: unknown,
+): asserts value is { timeout: { signal: AbortSignal } } {
+	if (!hasTimeoutContext(value)) {
+		throw new Error("Expected timeout context with AbortSignal");
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Rate Limit - In-Memory Store
 // ---------------------------------------------------------------------------
@@ -130,8 +168,8 @@ describe("createRateLimitMiddleware exceeds limit", () => {
 			await executeMiddlewareChain([middleware], createTestContext());
 			expect.fail("Should have thrown");
 		} catch (error) {
-			expect(error).toBeInstanceOf(StorageServerError);
-			const serverError = error as StorageServerError;
+			assertIsStorageServerError(error);
+			const serverError = error;
 			expect(serverError.code).toBe(StorageErrorCode.FORBIDDEN);
 			expect(serverError.message).toBe("Rate limit exceeded");
 		}
@@ -267,8 +305,8 @@ describe("createCorsMiddleware preflight with allowed origin", () => {
 			);
 			expect.fail("Should have thrown Response");
 		} catch (response) {
-			expect(response).toBeInstanceOf(Response);
-			const res = response as Response;
+			assertIsResponse(response);
+			const res = response;
 			expect(res.status).toBe(204);
 			expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
 				"http://example.com",
@@ -293,7 +331,8 @@ describe("createCorsMiddleware preflight default methods", () => {
 			);
 			expect.fail("Should have thrown Response");
 		} catch (response) {
-			const res = response as Response;
+			assertIsResponse(response);
+			const res = response;
 			const methods = res.headers.get("Access-Control-Allow-Methods");
 			expect(methods).toBe("GET, POST, PUT, DELETE, OPTIONS");
 		}
@@ -316,7 +355,8 @@ describe("createCorsMiddleware preflight default headers", () => {
 			);
 			expect.fail("Should have thrown Response");
 		} catch (response) {
-			const res = response as Response;
+			assertIsResponse(response);
+			const res = response;
 			const headers = res.headers.get("Access-Control-Allow-Headers");
 			expect(headers).toBe("Content-Type, Authorization");
 		}
@@ -340,7 +380,8 @@ describe("createCorsMiddleware preflight maxAge", () => {
 			);
 			expect.fail("Should have thrown Response");
 		} catch (response) {
-			const res = response as Response;
+			assertIsResponse(response);
+			const res = response;
 			expect(res.headers.get("Access-Control-Max-Age")).toBe("3600");
 		}
 	});
@@ -364,7 +405,8 @@ describe("createCorsMiddleware preflight custom methods and headers", () => {
 			);
 			expect.fail("Should have thrown Response");
 		} catch (response) {
-			const res = response as Response;
+			assertIsResponse(response);
+			const res = response;
 			expect(res.headers.get("Access-Control-Allow-Methods")).toBe(
 				"GET, POST",
 			);
@@ -593,7 +635,7 @@ describe("createLoggingMiddleware logs for included paths", () => {
 // Timeout
 // ---------------------------------------------------------------------------
 
-describe("createTimeoutMiddleware returns AbortSignal", () => {
+	describe("createTimeoutMiddleware returns AbortSignal", () => {
 	it("returns AbortSignal in context", async () => {
 		const middleware = createTimeoutMiddleware({ timeoutMs: 5_000 });
 
@@ -602,13 +644,13 @@ describe("createTimeoutMiddleware returns AbortSignal", () => {
 			createTestContext(),
 		);
 
-		const context = result.context as { timeout: { signal: AbortSignal } };
-		expect(context.timeout.signal).toBeInstanceOf(AbortSignal);
-		expect(context.timeout.signal.aborted).toBe(false);
+		assertHasTimeoutContext(result.context);
+		expect(result.context.timeout.signal).toBeInstanceOf(AbortSignal);
+		expect(result.context.timeout.signal.aborted).toBe(false);
 	});
 });
 
-describe("createTimeoutMiddleware signal aborts after timeout", () => {
+	describe("createTimeoutMiddleware signal aborts after timeout", () => {
 	it("aborts signal after configured timeout", async () => {
 		const middleware = createTimeoutMiddleware({ timeoutMs: 10 });
 
@@ -617,10 +659,10 @@ describe("createTimeoutMiddleware signal aborts after timeout", () => {
 			createTestContext(),
 		);
 
-		const context = result.context as { timeout: { signal: AbortSignal } };
 		await new Promise((resolve) => setTimeout(resolve, 50));
 
-		expect(context.timeout.signal.aborted).toBe(true);
+		assertHasTimeoutContext(result.context);
+		expect(result.context.timeout.signal.aborted).toBe(true);
 	});
 });
 

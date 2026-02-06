@@ -21,6 +21,19 @@ type RateLimitResult = {
 	rateLimit: { remaining: number };
 };
 
+function validateRateLimitConfig(config: RateLimitConfig): void {
+	const isValidMax =
+		Number.isFinite(config.maxRequests) && config.maxRequests > 0;
+	const isValidWindow =
+		Number.isFinite(config.windowMs) && config.windowMs > 0;
+
+	if (!isValidMax || !isValidWindow) {
+		throw new Error(
+			"Rate limit middleware requires maxRequests and windowMs to be > 0",
+		);
+	}
+}
+
 /** Creates an in-memory rate limit store using fixed windows. */
 export function createInMemoryRateLimitStore(): RateLimitStore {
 	const windows = new Map<string, { count: number; expiresAt: number }>();
@@ -45,6 +58,7 @@ export function createInMemoryRateLimitStore(): RateLimitStore {
 export function createRateLimitMiddleware(
 	config: RateLimitConfig,
 ): StorageMiddleware<object, RateLimitResult> {
+	validateRateLimitConfig(config);
 	return createStorageMiddleware(
 		{
 			name: "rate-limit",
