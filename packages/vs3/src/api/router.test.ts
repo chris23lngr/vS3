@@ -174,6 +174,34 @@ describe("router", () => {
 		);
 	});
 
+	it("handles download-url requests end-to-end", async () => {
+		const adapter = createAdapter();
+		const options = {
+			bucket: "test-bucket",
+			adapter,
+		};
+		const context = createContext(options);
+		const { handler } = router(options, context);
+
+		const request = new Request("http://localhost/download-url", {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+			},
+			body: JSON.stringify({
+				key: "uploads/photo.png",
+			}),
+		});
+
+		const response = await handler(request);
+		const data = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(data).toEqual({
+			presignedUrl: "https://example.com/download",
+		});
+	});
+
 	it("rejects requests when middleware throws via HTTP handler", async () => {
 		const middleware = createStorageMiddleware({ name: "blocker" }, async () => {
 			throw new Error("unauthorized");
