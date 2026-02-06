@@ -9,7 +9,7 @@
 		"dev": "turbo run dev",
 		"test": "turbo run test",
 		"test:ci": "turbo run test --filter=vs3 -- --coverage",
-		"check": "biome check .",
+		"check": "biome check . --error-on-warnings",
 		"check:write": "biome check --write .",
 		"check:unsafe": "biome check --write --unsafe .",
 		"prepare": "husky",
