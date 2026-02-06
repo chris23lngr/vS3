@@ -2,10 +2,8 @@ import { StorageErrorCode } from "../../core/error/codes";
 import type { AuthHook, AuthHookResult } from "../../types/security";
 import { throwVerificationFailure } from "./errors";
 
-function buildAuthHeaders(
-	request: Request,
-): Record<string, string | undefined> {
-	const headers: Record<string, string | undefined> = {};
+function buildAuthHeaders(request: Request): Record<string, string> {
+	const headers: Record<string, string> = {};
 	request.headers.forEach((value, key) => {
 		headers[key] = value;
 	});

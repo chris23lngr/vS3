@@ -19,6 +19,7 @@ function validateTimeoutConfig(config: TimeoutConfig): void {
 }
 
 function createTimeoutSignal(timeoutMs: number): AbortSignal {
+	// AbortSignal.timeout() is not in all TS lib targets; cast to access it at runtime (Node 16+).
 	const timeoutFn = (
 		AbortSignal as { timeout?: (ms: number) => AbortSignal }
 	).timeout;
@@ -30,6 +31,7 @@ function createTimeoutSignal(timeoutMs: number): AbortSignal {
 	const controller = new AbortController();
 	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
+	// setTimeout returns NodeJS.Timeout in Node, which has unref(); cast to access it portably.
 	const unref = (timeoutId as { unref?: () => void }).unref;
 	if (typeof unref === "function") {
 		unref();

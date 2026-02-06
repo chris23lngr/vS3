@@ -73,21 +73,11 @@ export function handleVerificationFailure(
 	context: VerificationFailureContext,
 ): never {
 	const errorInfo = VERIFICATION_ERROR_MAP[reason];
-	if (errorInfo) {
-		throwVerificationFailure({
-			...context,
-			reason,
-			code: errorInfo.code,
-			message: errorInfo.message,
-			details: { reason },
-		});
-	}
-
 	throwVerificationFailure({
 		...context,
 		reason,
-		code: StorageErrorCode.SIGNATURE_INVALID,
-		message: "Request signature verification failed.",
+		code: errorInfo.code,
+		message: errorInfo.message,
 		details: { reason },
 	});
 }
