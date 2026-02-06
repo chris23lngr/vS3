@@ -224,4 +224,61 @@ describe("xhrUpload options", () => {
 		vi.doUnmock("./xhr-factory");
 		vi.resetModules();
 	});
+
+	it("normalizes content-type header casing", async () => {
+		let capturedHeaders: Record<string, string> | undefined;
+
+		vi.resetModules();
+
+		vi.doMock("./xhr-factory", () => ({
+			XhrFactory: class MockXhrFactory {
+				private loadHandler:
+					| ((
+							success: boolean,
+							status: number,
+							statusText: string,
+							cleanup: () => void,
+					  ) => void)
+					| undefined;
+
+				open() {}
+				appendHeaders(headers?: Record<string, string>) {
+					capturedHeaders = headers;
+				}
+				appendProgressHandler() {}
+				appendErrorHandler() {}
+				appendAbortHandler() {}
+				appendLoadHandler(
+					handler: (
+						success: boolean,
+						status: number,
+						statusText: string,
+						cleanup: () => void,
+					) => void,
+				) {
+					this.loadHandler = handler;
+				}
+				send() {
+					if (!this.loadHandler) {
+						throw new Error("Load handler not initialized");
+					}
+					this.loadHandler(true, 200, "OK", () => {});
+				}
+			},
+		}));
+
+		const { xhrUpload } = await import("./upload");
+		const mockFile = new File(["test"], "test.txt", { type: "text/plain" });
+
+		await xhrUpload("https://example.com/upload", mockFile, {
+			headers: { "Content-Type": "image/png" },
+		});
+
+		expect(capturedHeaders).toEqual({
+			"content-type": "image/png",
+		});
+
+		vi.doUnmock("./xhr-factory");
+		vi.resetModules();
+	});
 });
