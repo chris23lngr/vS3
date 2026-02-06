@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { StorageErrorCode } from "../../core/error/codes";
 import { StorageServerError } from "../../core/error/error";
-import type { StorageContext } from "../../types/context";
 import { createStorageMiddleware } from "../core/create-middleware";
 import { executeMiddlewareChain } from "../core/execute-chain";
 import type { MiddlewareHandler, StorageMiddlewareContext } from "../types";

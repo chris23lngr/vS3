@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getCurrentStorageContext } from "../context/endpoint-context";
 import { createStorageMiddleware } from "../middleware";
 import type { StorageMiddleware } from "../middleware/types";

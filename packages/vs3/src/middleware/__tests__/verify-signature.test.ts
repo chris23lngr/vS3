@@ -83,8 +83,8 @@ describe("createVerifySignatureMiddleware", () => {
 			const result = await middleware.handler(ctx);
 
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
-			expect(result!.signature.timestamp).toBeGreaterThan(0);
+			expect(result?.signature.verified).toBe(true);
+			expect(result?.signature.timestamp).toBeGreaterThan(0);
 		});
 
 		it("throws on missing signature header", async () => {
@@ -243,7 +243,7 @@ describe("createVerifySignatureMiddleware", () => {
 			const ctx = createMiddlewareContext(request);
 			const result = await middleware.handler(ctx);
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
+			expect(result?.signature.verified).toBe(true);
 		});
 
 		it("rejects expired timestamp", async () => {
@@ -337,8 +337,8 @@ describe("createVerifySignatureMiddleware", () => {
 			const ctx = createMiddlewareContext(request);
 			const result = await middleware.handler(ctx);
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
-			expect(result!.signature.nonce).toBe("unique-nonce-123");
+			expect(result?.signature.verified).toBe(true);
+			expect(result?.signature.nonce).toBe("unique-nonce-123");
 		});
 
 		it("rejects reused nonce", async () => {
@@ -364,7 +364,7 @@ describe("createVerifySignatureMiddleware", () => {
 			const ctx1 = createMiddlewareContext(request1);
 			const result1 = await middleware.handler(ctx1);
 			expect(result1).toBeDefined();
-			expect(result1!.signature.verified).toBe(true);
+			expect(result1?.signature.verified).toBe(true);
 
 			// Second request with same nonce fails
 			const request2 = await createSignedRequest(signer, {
@@ -444,8 +444,8 @@ describe("createVerifySignatureMiddleware", () => {
 
 			expect(authHook).toHaveBeenCalledTimes(1);
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
-			expect(result!.signature.auth).toEqual({
+			expect(result?.signature.verified).toBe(true);
+			expect(result?.signature.auth).toEqual({
 				userId: "user-123",
 				metadata: { role: "admin" },
 			});
@@ -524,7 +524,7 @@ describe("createVerifySignatureMiddleware", () => {
 			const ctx = createMiddlewareContext(request);
 			const result = await middleware.handler(ctx);
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
+			expect(result?.signature.verified).toBe(true);
 		});
 
 		it("verifies PUT requests with body", async () => {
@@ -542,7 +542,7 @@ describe("createVerifySignatureMiddleware", () => {
 			const ctx = createMiddlewareContext(request);
 			const result = await middleware.handler(ctx);
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
+			expect(result?.signature.verified).toBe(true);
 		});
 
 		it("verifies DELETE requests", async () => {
@@ -567,7 +567,7 @@ describe("createVerifySignatureMiddleware", () => {
 			const ctx = createMiddlewareContext(request);
 			const result = await middleware.handler(ctx);
 			expect(result).toBeDefined();
-			expect(result!.signature.verified).toBe(true);
+			expect(result?.signature.verified).toBe(true);
 		});
 	});
 
@@ -656,6 +656,6 @@ describe("createClientRequestSigner", () => {
 		const ctx = createMiddlewareContext(request);
 		const result = await middleware.handler(ctx);
 		expect(result).toBeDefined();
-		expect(result!.signature.verified).toBe(true);
+		expect(result?.signature.verified).toBe(true);
 	});
 });
