@@ -46,14 +46,53 @@ function buildMiddlewareRequest(
 	});
 }
 
+function isHeadersArray(value: unknown): value is [string, string][] {
+	return (
+		Array.isArray(value) &&
+		value.every(
+			(entry) =>
+				Array.isArray(entry) &&
+				entry.length === 2 &&
+				typeof entry[0] === "string" &&
+				typeof entry[1] === "string",
+		)
+	);
+}
+
+function isHeadersRecord(value: unknown): value is Record<string, string> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return false;
+	}
+
+	return Object.values(value).every((entry) => typeof entry === "string");
+}
+
+function resolveHeaders(
+	context: Record<string, unknown>,
+	request: Request,
+): Headers {
+	if (context?.headers instanceof Headers) {
+		return context.headers;
+	}
+
+	if (isHeadersArray(context?.headers) || isHeadersRecord(context?.headers)) {
+		return new Headers(context.headers);
+	}
+
+	if (context?.request instanceof Request) {
+		return context.request.headers;
+	}
+
+	return request.headers;
+}
+
 async function runGlobalMiddlewares(
 	middlewares: readonly StorageMiddleware[],
 	endpointPath: string,
 	context: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
 	const request = buildMiddlewareRequest(endpointPath, context);
-	const headers =
-		context?.headers instanceof Headers ? context.headers : request.headers;
+	const headers = resolveHeaders(context, request);
 
 	const middlewareCtx: StorageMiddlewareContext = {
 		method: resolveMethod(context),

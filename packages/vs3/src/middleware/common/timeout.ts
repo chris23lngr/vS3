@@ -34,7 +34,7 @@ function createTimeoutSignal(timeoutMs: number): AbortSignal {
 	// setTimeout returns NodeJS.Timeout in Node, which has unref(); cast to access it portably.
 	const unref = (timeoutId as { unref?: () => void }).unref;
 	if (typeof unref === "function") {
-		unref();
+		unref.call(timeoutId);
 	}
 
 	return controller.signal;

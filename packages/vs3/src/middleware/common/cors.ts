@@ -41,6 +41,7 @@ function buildPreflightHeaders(
 		"Access-Control-Allow-Methods": methods,
 		"Access-Control-Allow-Headers": headers,
 	};
+	result.Vary = "Origin";
 
 	if (config.maxAge !== undefined) {
 		result["Access-Control-Max-Age"] = String(config.maxAge);
