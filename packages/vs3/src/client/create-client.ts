@@ -154,7 +154,8 @@ async function executeUploadRequest<M extends StandardSchemaV1>(
 	fileInfo: FileInfo,
 	metadata: StandardSchemaV1.InferInput<M>,
 	encryption: S3Encryption | undefined,
-	onProgress?: (progress: number) => void,
+	onProgress: ((progress: number) => void) | undefined,
+	retry: undefined | true | number,
 ): Promise<UploadFileResult> {
 	const body = encryption
 		? { fileInfo, metadata, encryption }
@@ -184,6 +185,7 @@ async function executeUploadRequest<M extends StandardSchemaV1>(
 	const { key, presignedUrl, uploadHeaders } = parsedResponse.data;
 	const uploadResult = await xhrUpload(presignedUrl, file, {
 		onProgress,
+		retry,
 		headers: uploadHeaders ?? {},
 	});
 
@@ -352,7 +354,7 @@ export function createBaseClient<
 				}
 			>,
 		): Promise<UploadFileResult> => {
-			const { onError, onSuccess, onProgress, encryption } = options ?? {};
+			const { onError, onSuccess, onProgress, encryption, retry } = options ?? {};
 			const { fileInfo } = await validateUploadFileInput({
 				file,
 				maxFileSize,
@@ -368,6 +370,7 @@ export function createBaseClient<
 					metadata,
 					encryption,
 					onProgress,
+					retry,
 				);
 				onSuccess?.(result);
 				return result;
