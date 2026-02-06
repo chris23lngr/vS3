@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import z from "zod";
 import { createContext } from "../context/create-context";
+import { createStorageMiddleware } from "../middleware";
 import type { Adapter } from "../types/adapter";
 import { router } from "./router";
 
@@ -127,5 +128,83 @@ describe("router", () => {
 		expect(data).toHaveProperty("key");
 		// Verify the adapter was called (which means context was available)
 		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalled();
+	});
+
+	it("executes middlewares via the HTTP handler path", async () => {
+		const middlewareHandler = vi.fn().mockResolvedValue({ verified: true });
+		const middleware = createStorageMiddleware(
+			{ name: "http-test" },
+			middlewareHandler,
+		);
+
+		const adapter = createAdapter();
+		const options = {
+			bucket: "test-bucket",
+			adapter,
+			metadataSchema: z.object({
+				userId: z.string(),
+			}),
+			generateKey: vi.fn().mockResolvedValue("test-key.png"),
+			middlewares: [middleware],
+		};
+		const context = createContext(options);
+		const { handler } = router(options, context);
+
+		const request = new Request("http://localhost/upload-url", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				fileInfo: {
+					name: "test.png",
+					size: 100,
+					contentType: "image/png",
+				},
+				metadata: { userId: "user-1" },
+			}),
+		});
+
+		const response = await handler(request);
+
+		expect(response.status).toBe(200);
+		expect(middlewareHandler).toHaveBeenCalledTimes(1);
+		expect(middlewareHandler).toHaveBeenCalledWith(
+			expect.objectContaining({
+				path: "/upload-url",
+			}),
+		);
+	});
+
+	it("rejects requests when middleware throws via HTTP handler", async () => {
+		const middleware = createStorageMiddleware(
+			{ name: "blocker" },
+			async () => {
+				throw new Error("unauthorized");
+			},
+		);
+
+		const adapter = createAdapter();
+		const options = {
+			bucket: "test-bucket",
+			adapter,
+			middlewares: [middleware],
+		};
+		const context = createContext(options);
+		const { handler } = router(options, context);
+
+		const request = new Request("http://localhost/upload-url", {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				fileInfo: {
+					name: "test.png",
+					size: 100,
+					contentType: "image/png",
+				},
+			}),
+		});
+
+		const response = await handler(request);
+
+		expect(response.status).toBeGreaterThanOrEqual(400);
 	});
 });

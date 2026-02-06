@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getCurrentStorageContext } from "../context/endpoint-context";
+import { createStorageMiddleware } from "../middleware";
+import type { StorageMiddleware } from "../middleware/types";
 import type { StorageContext } from "../types/context";
 import type { StorageOptions } from "../types/options";
 import { toStorageEndpoints } from "./to-storage-endpoints";
@@ -24,6 +26,20 @@ const createStorageContext = (): StorageContext<StorageOptions> => ({
 			generatePresignedDownloadUrl: async () => "url",
 			deleteObject: async () => {},
 		},
+	},
+});
+
+const createStorageContextWithMiddlewares = (
+	middlewares: readonly StorageMiddleware[],
+): StorageContext<StorageOptions> => ({
+	$options: {
+		bucket: "test-bucket",
+		adapter: {
+			generatePresignedUploadUrl: async () => "url",
+			generatePresignedDownloadUrl: async () => "url",
+			deleteObject: async () => {},
+		},
+		middlewares,
 	},
 });
 
@@ -185,5 +201,72 @@ describe("toStorageEndpoints", () => {
 
 		expect(api.uploadUrl.path).toBe("/upload-url");
 		expect(api.uploadUrl.options).toEqual({ method: "POST" });
+	});
+
+	it("exposes middleware results under $middleware namespace", async () => {
+		const middleware = createStorageMiddleware(
+			{ name: "auth" },
+			async () => ({ userId: "user-42", role: "admin" }),
+		);
+
+		const storageContext = createStorageContextWithMiddlewares([middleware]);
+		const endpoint: TestEndpoint = Object.assign(
+			async (ctx: any) => ({
+				middlewareContext: ctx.context.$middleware,
+			}),
+			{ path: "/upload-url", options: { method: "POST" as const } },
+		);
+
+		const api = toStorageEndpoints({ test: endpoint }, storageContext);
+		const result = await api.test({ body: {} });
+
+		expect(result).toEqual({
+			middlewareContext: { userId: "user-42", role: "admin" },
+		});
+	});
+
+	it("does not set $middleware when no middlewares are configured", async () => {
+		const storageContext = createStorageContext();
+		const endpoint: TestEndpoint = Object.assign(
+			async (ctx: any) => ({
+				hasMiddleware: "$middleware" in ctx.context,
+				middlewareValue: ctx.context.$middleware,
+			}),
+			{ path: "/test", options: { method: "POST" as const } },
+		);
+
+		const api = toStorageEndpoints({ test: endpoint }, storageContext);
+		const result = await api.test({ body: {} });
+
+		expect(result).toEqual({
+			hasMiddleware: true,
+			middlewareValue: undefined,
+		});
+	});
+
+	it("does not allow middleware results to overwrite $options", async () => {
+		const maliciousMiddleware = createStorageMiddleware(
+			{ name: "malicious" },
+			async () => ({ $options: null } as unknown as Record<string, unknown>),
+		);
+
+		const storageContext = createStorageContextWithMiddlewares([
+			maliciousMiddleware,
+		]);
+		const endpoint: TestEndpoint = Object.assign(
+			async (ctx: any) => ({
+				bucket: ctx.context.$options.bucket,
+				optionsIntact: ctx.context.$options !== null,
+			}),
+			{ path: "/test", options: { method: "POST" as const } },
+		);
+
+		const api = toStorageEndpoints({ test: endpoint }, storageContext);
+		const result = await api.test({ body: {} });
+
+		expect(result).toEqual({
+			bucket: "test-bucket",
+			optionsIntact: true,
+		});
 	});
 });

@@ -1,6 +1,5 @@
 import {
 	createEndpoint,
-	createMiddleware,
 	type EndpointContext,
 	type EndpointOptions,
 	type StrictEndpoint,
@@ -94,11 +93,6 @@ export function createStorageEndpoint<
 		path,
 		{
 			...endpointOptions,
-			use: [
-				createMiddleware(async () => {
-					return {} as StorageContext;
-				}),
-			],
 			body: bodySchema,
 		} as unknown as ExtendedOptions<Options, M>,
 		async (ctx) => runWithEndpointContext(ctx as any, () => handler(ctx)),

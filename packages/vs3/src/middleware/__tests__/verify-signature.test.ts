@@ -1,14 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StorageErrorCode } from "../core/error/codes";
-import { StorageServerError } from "../core/error/error";
+import { StorageErrorCode } from "../../core/error/codes";
+import { StorageServerError } from "../../core/error/error";
 import {
 	createInMemoryNonceStore,
 	createRequestSigner,
-} from "../core/security/request-signer";
-import {
-	createClientRequestSigner,
-	createVerifySignatureMiddleware,
-} from "./verify-signature";
+} from "../../core/security/request-signer";
+import { executeMiddlewareChain } from "../core/execute-chain";
+import { createClientRequestSigner } from "../signature/client-signer";
+import { createVerifySignatureMiddleware } from "../signature/verify-signature";
+import type { StorageMiddlewareContext } from "../types";
+
+function createMiddlewareContext(
+	request: Request,
+): StorageMiddlewareContext {
+	let path: string;
+	try {
+		path = new URL(request.url).pathname;
+	} catch {
+		path = request.url;
+	}
+	return {
+		method: request.method,
+		path,
+		request,
+		headers: request.headers,
+		context: {},
+	};
+}
 
 describe("createVerifySignatureMiddleware", () => {
 	const testSecret = "test-middleware-secret-key";
@@ -58,17 +76,23 @@ describe("createVerifySignatureMiddleware", () => {
 	describe("basic verification", () => {
 		it("verifies a valid signed request", async () => {
 			const signer = createRequestSigner({ secret: testSecret });
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const request = await createSignedRequest(signer);
-			const result = await middleware(request);
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
 
-			expect(result.verified).toBe(true);
-			expect(result.timestamp).toBeGreaterThan(0);
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
+			expect(result!.signature.timestamp).toBeGreaterThan(0);
 		});
 
 		it("throws on missing signature header", async () => {
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const request = new Request("http://localhost/upload-url", {
 				method: "POST",
@@ -79,10 +103,13 @@ describe("createVerifySignatureMiddleware", () => {
 				body: "{}",
 			});
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -92,7 +119,9 @@ describe("createVerifySignatureMiddleware", () => {
 		});
 
 		it("throws on missing timestamp header", async () => {
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const request = new Request("http://localhost/upload-url", {
 				method: "POST",
@@ -103,10 +132,13 @@ describe("createVerifySignatureMiddleware", () => {
 				body: "{}",
 			});
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -116,7 +148,9 @@ describe("createVerifySignatureMiddleware", () => {
 		});
 
 		it("throws on invalid timestamp format", async () => {
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const request = new Request("http://localhost/upload-url", {
 				method: "POST",
@@ -128,10 +162,13 @@ describe("createVerifySignatureMiddleware", () => {
 				body: "{}",
 			});
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -141,7 +178,9 @@ describe("createVerifySignatureMiddleware", () => {
 		});
 
 		it("throws on invalid signature", async () => {
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const request = new Request("http://localhost/upload-url", {
 				method: "POST",
@@ -153,10 +192,13 @@ describe("createVerifySignatureMiddleware", () => {
 				body: "{}",
 			});
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -167,14 +209,19 @@ describe("createVerifySignatureMiddleware", () => {
 
 		it("throws on signature with wrong secret", async () => {
 			const wrongSigner = createRequestSigner({ secret: "wrong-secret" });
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const request = await createSignedRequest(wrongSigner);
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -205,8 +252,10 @@ describe("createVerifySignatureMiddleware", () => {
 			const timestamp = Date.now() - 30000;
 			const request = await createSignedRequest(signer, { timestamp });
 
-			const result = await middleware(request);
-			expect(result.verified).toBe(true);
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
 		});
 
 		it("rejects expired timestamp", async () => {
@@ -220,10 +269,13 @@ describe("createVerifySignatureMiddleware", () => {
 			const timestamp = Date.now() - 120000;
 			const request = await createSignedRequest(signer, { timestamp });
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -243,10 +295,13 @@ describe("createVerifySignatureMiddleware", () => {
 			const timestamp = Date.now() + 120000;
 			const request = await createSignedRequest(signer, { timestamp });
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -266,10 +321,13 @@ describe("createVerifySignatureMiddleware", () => {
 
 			const request = await createSignedRequest(signer);
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -294,9 +352,11 @@ describe("createVerifySignatureMiddleware", () => {
 				nonce: "unique-nonce-123",
 			});
 
-			const result = await middleware(request);
-			expect(result.verified).toBe(true);
-			expect(result.nonce).toBe("unique-nonce-123");
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
+			expect(result!.signature.nonce).toBe("unique-nonce-123");
 		});
 
 		it("rejects reused nonce", async () => {
@@ -315,17 +375,28 @@ describe("createVerifySignatureMiddleware", () => {
 			const timestamp = Date.now();
 
 			// First request succeeds
-			const request1 = await createSignedRequest(signer, { nonce, timestamp });
-			const result1 = await middleware(request1);
-			expect(result1.verified).toBe(true);
+			const request1 = await createSignedRequest(signer, {
+				nonce,
+				timestamp,
+			});
+			const ctx1 = createMiddlewareContext(request1);
+			const result1 = await middleware.handler(ctx1);
+			expect(result1).toBeDefined();
+			expect(result1!.signature.verified).toBe(true);
 
 			// Second request with same nonce fails
-			const request2 = await createSignedRequest(signer, { nonce, timestamp });
+			const request2 = await createSignedRequest(signer, {
+				nonce,
+				timestamp,
+			});
+			const ctx2 = createMiddlewareContext(request2);
 
-			await expect(middleware(request2)).rejects.toThrow(StorageServerError);
+			await expect(middleware.handler(ctx2)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request2);
+				await middleware.handler(ctx2);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -346,8 +417,16 @@ describe("createVerifySignatureMiddleware", () => {
 				method: "GET",
 			});
 
-			const result = await middleware(request);
-			expect(result.verified).toBe(true);
+			const ctx = createMiddlewareContext(request);
+			const chainResult = await executeMiddlewareChain(
+				[middleware],
+				ctx,
+			);
+
+			// When skipped, no signature context is added
+			expect(
+				(chainResult.context as Record<string, unknown>).signature,
+			).toBeUndefined();
 		});
 
 		it("does not skip verification for non-configured paths", async () => {
@@ -361,7 +440,10 @@ describe("createVerifySignatureMiddleware", () => {
 				body: "{}",
 			});
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(
+				executeMiddlewareChain([middleware], ctx),
+			).rejects.toThrow(StorageServerError);
 		});
 	});
 
@@ -380,11 +462,13 @@ describe("createVerifySignatureMiddleware", () => {
 			});
 
 			const request = await createSignedRequest(signer);
-			const result = await middleware(request);
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
 
 			expect(authHook).toHaveBeenCalledTimes(1);
-			expect(result.verified).toBe(true);
-			expect(result.auth).toEqual({
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
+			expect(result!.signature.auth).toEqual({
 				userId: "user-123",
 				metadata: { role: "admin" },
 			});
@@ -404,10 +488,13 @@ describe("createVerifySignatureMiddleware", () => {
 
 			const request = await createSignedRequest(signer);
 
-			await expect(middleware(request)).rejects.toThrow(StorageServerError);
+			const ctx = createMiddlewareContext(request);
+			await expect(middleware.handler(ctx)).rejects.toThrow(
+				StorageServerError,
+			);
 
 			try {
-				await middleware(request);
+				await middleware.handler(ctx);
 			} catch (error) {
 				expect(error).toBeInstanceOf(StorageServerError);
 				expect((error as StorageServerError).code).toBe(
@@ -418,7 +505,9 @@ describe("createVerifySignatureMiddleware", () => {
 
 		it("receives headers in authHook context", async () => {
 			const signer = createRequestSigner({ secret: testSecret });
-			const authHook = vi.fn().mockResolvedValue({ authenticated: true });
+			const authHook = vi
+				.fn()
+				.mockResolvedValue({ authenticated: true });
 
 			const middleware = createVerifySignatureMiddleware({
 				secret: testSecret,
@@ -426,7 +515,8 @@ describe("createVerifySignatureMiddleware", () => {
 			});
 
 			const request = await createSignedRequest(signer);
-			await middleware(request);
+			const ctx = createMiddlewareContext(request);
+			await middleware.handler(ctx);
 
 			expect(authHook).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -441,7 +531,9 @@ describe("createVerifySignatureMiddleware", () => {
 	describe("different HTTP methods", () => {
 		it("verifies GET requests", async () => {
 			const signer = createRequestSigner({ secret: testSecret });
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const signed = await signer.sign({
 				method: "GET",
@@ -456,24 +548,35 @@ describe("createVerifySignatureMiddleware", () => {
 				},
 			});
 
-			const result = await middleware(request);
-			expect(result.verified).toBe(true);
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
 		});
 
 		it("verifies PUT requests with body", async () => {
 			const signer = createRequestSigner({ secret: testSecret });
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const body = JSON.stringify({ update: true });
-			const request = await createSignedRequest(signer, { method: "PUT", body });
+			const request = await createSignedRequest(signer, {
+				method: "PUT",
+				body,
+			});
 
-			const result = await middleware(request);
-			expect(result.verified).toBe(true);
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
 		});
 
 		it("verifies DELETE requests", async () => {
 			const signer = createRequestSigner({ secret: testSecret });
-			const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
 
 			const signed = await signer.sign({
 				method: "DELETE",
@@ -488,8 +591,42 @@ describe("createVerifySignatureMiddleware", () => {
 				},
 			});
 
-			const result = await middleware(request);
-			expect(result.verified).toBe(true);
+			const ctx = createMiddlewareContext(request);
+			const result = await middleware.handler(ctx);
+			expect(result).toBeDefined();
+			expect(result!.signature.verified).toBe(true);
+		});
+	});
+
+	describe("middleware chain integration", () => {
+		it("adds signature context to chain result", async () => {
+			const signer = createRequestSigner({ secret: testSecret });
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+			});
+
+			const request = await createSignedRequest(signer);
+			const ctx = createMiddlewareContext(request);
+			const chainResult = await executeMiddlewareChain(
+				[middleware],
+				ctx,
+			);
+
+			const context = chainResult.context as {
+				signature: { verified: boolean; timestamp: number };
+			};
+			expect(context.signature.verified).toBe(true);
+			expect(context.signature.timestamp).toBeGreaterThan(0);
+		});
+
+		it("returns StorageMiddleware with correct config", () => {
+			const middleware = createVerifySignatureMiddleware({
+				secret: testSecret,
+				skipPaths: ["/health"],
+			});
+
+			expect(middleware.config.name).toBe("verify-signature");
+			expect(middleware.config.skipPaths).toEqual(["/health"]);
 		});
 	});
 });
@@ -526,7 +663,9 @@ describe("createClientRequestSigner", () => {
 
 	it("produces signatures that can be verified", async () => {
 		const clientSigner = createClientRequestSigner({ secret: testSecret });
-		const middleware = createVerifySignatureMiddleware({ secret: testSecret });
+		const middleware = createVerifySignatureMiddleware({
+			secret: testSecret,
+		});
 
 		const body = JSON.stringify({ data: "test" });
 		const { headers } = await clientSigner.sign({
@@ -544,7 +683,9 @@ describe("createClientRequestSigner", () => {
 			body,
 		});
 
-		const result = await middleware(request);
-		expect(result.verified).toBe(true);
+		const ctx = createMiddlewareContext(request);
+		const result = await middleware.handler(ctx);
+		expect(result).toBeDefined();
+		expect(result!.signature.verified).toBe(true);
 	});
 });

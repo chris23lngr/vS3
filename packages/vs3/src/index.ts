@@ -17,13 +17,33 @@ export {
 	runContentValidators,
 } from "./core/validation";
 export { toNextJsRouteHandler } from "./integrations/next-js";
+// Middleware system exports
 export type {
+	ChainExecutionResult,
+	CorsConfig,
+	LogEntry,
+	LogFn,
+	LoggingConfig,
+	MiddlewareConfig,
+	MiddlewareHandler,
+	RateLimitConfig,
+	RateLimitStore,
+	StorageMiddleware,
+	StorageMiddlewareContext,
+	TimeoutConfig,
 	VerificationResult,
 	VerifySignatureMiddlewareConfig,
 } from "./middleware";
 export {
 	createClientRequestSigner,
+	createCorsMiddleware,
+	createInMemoryRateLimitStore,
+	createLoggingMiddleware,
+	createRateLimitMiddleware,
+	createStorageMiddleware,
+	createTimeoutMiddleware,
 	createVerifySignatureMiddleware,
+	executeMiddlewareChain,
 } from "./middleware";
 export { createStorage } from "./storage/create-storage";
 export type { Adapter } from "./types/adapter";
