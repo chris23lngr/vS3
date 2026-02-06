@@ -44,6 +44,11 @@ const uploadUrlResponseSchema = z.object({
 	uploadHeaders: z.record(z.string(), z.string()).optional(),
 });
 
+const downloadUrlResponseSchema = z.object({
+	presignedUrl: z.string(),
+	downloadHeaders: z.record(z.string(), z.string()).optional(),
+});
+
 function createClientValidationError(
 	issue: FileValidationIssue,
 ): StorageClientError {
@@ -298,6 +303,16 @@ export type UploadFileResult = {
 	uploadHeaders?: Record<string, string>;
 };
 
+/**
+ * Result returned from downloadFile operation.
+ */
+export type DownloadFileResult = {
+	/** The presigned URL for downloading the file */
+	presignedUrl: string;
+	/** Headers to include when fetching the presigned URL, if any */
+	downloadHeaders?: Record<string, string>;
+};
+
 type ClientFnOptions = {
 	onError?: (error: StorageError) => void;
 	onSuccess?: (result: UploadFileResult) => void;
@@ -376,6 +391,92 @@ export function createBaseClient<
 				return result;
 			} catch (error) {
 				handleUploadError(error, onError);
+			}
+		},
+
+		/**
+		 * Gets a presigned download URL for a file in storage.
+		 *
+		 * @param key - The key/path of the file to download
+		 * @param options - Download options including callbacks and encryption
+		 * @returns Download result containing the presigned URL and optional headers
+		 *
+		 * @example
+		 * ```typescript
+		 * const result = await client.downloadFile("uploads/photo.png");
+		 * window.location.href = result.presignedUrl;
+		 * ```
+		 */
+		downloadFile: async (
+			key: string,
+			options?: Partial<{
+				expiresIn: number;
+				encryption: S3Encryption;
+				onError: (error: StorageError) => void;
+				onSuccess: (result: DownloadFileResult) => void;
+			}>,
+		): Promise<DownloadFileResult> => {
+			const { expiresIn, encryption, onError, onSuccess } = options ?? {};
+
+			try {
+				const body: { key: string; expiresIn?: number; encryption?: S3Encryption } =
+					{ key };
+				if (expiresIn !== undefined) {
+					body.expiresIn = expiresIn;
+				}
+				if (encryption !== undefined) {
+					body.encryption = encryption;
+				}
+
+				const response = await $fetch("/download-url", { body });
+
+				if (response.error) {
+					throw new StorageClientError({
+						code: StorageErrorCode.UNKNOWN_ERROR,
+						details: `${response.error.status}: ${response.error.message ?? "Unknown error"}`,
+						message: response.error.message ?? "Unknown error",
+					});
+				}
+
+				const parsedResponse = downloadUrlResponseSchema.safeParse(response.data);
+				if (!parsedResponse.success) {
+					throw new StorageClientError({
+						code: StorageErrorCode.UNKNOWN_ERROR,
+						message: "Invalid download URL response.",
+						details: parsedResponse.error.flatten().fieldErrors,
+					});
+				}
+
+				const result: DownloadFileResult = {
+					presignedUrl: parsedResponse.data.presignedUrl,
+				};
+
+				if (
+					parsedResponse.data.downloadHeaders &&
+					Object.keys(parsedResponse.data.downloadHeaders).length > 0
+				) {
+					result.downloadHeaders = parsedResponse.data.downloadHeaders;
+				}
+
+				onSuccess?.(result);
+				return result;
+			} catch (error) {
+				if (error instanceof StorageError) {
+					onError?.(error);
+					throw error;
+				}
+
+				const storageError = new StorageClientError({
+					code: StorageErrorCode.NETWORK_ERROR,
+					message:
+						error instanceof Error
+							? error.message
+							: "Download URL request failed unexpectedly",
+					details: error instanceof Error ? error.stack : String(error),
+				});
+
+				onError?.(storageError);
+				throw storageError;
 			}
 		},
 	};
