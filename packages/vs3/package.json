@@ -1,6 +1,6 @@
 {
 	"name": "vs3",
-	"version": "1.0.0",
+	"version": "0.0.1-beta.0",
 	"description": "Type-safe S3 storage library with presigned uploads, validation, and framework integrations",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -46,12 +46,39 @@
 				"types": "./dist/adapters.d.cts",
 				"default": "./dist/adapters.cjs"
 			}
-		}
+		},
+		"./adapters/aws-s3": {
+			"import": {
+				"types": "./dist/aws-s3.d.ts",
+				"default": "./dist/aws-s3.js"
+			},
+			"require": {
+				"types": "./dist/aws-s3.d.cts",
+				"default": "./dist/aws-s3.cjs"
+			}
+		},
+		"./package.json": "./package.json"
 	},
 	"files": [
 		"dist"
 	],
 	"sideEffects": false,
+	"typesVersions": {
+		"*": {
+			"react": [
+				"./dist/react.d.ts"
+			],
+			"integrations/next-js": [
+				"./dist/next-js.d.ts"
+			],
+			"adapters": [
+				"./dist/adapters.d.ts"
+			],
+			"adapters/aws-s3": [
+				"./dist/aws-s3.d.ts"
+			]
+		}
+	},
 	"engines": {
 		"node": ">=18"
 	},
@@ -64,7 +91,8 @@
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"test:ui": "vitest --ui"
+		"test:ui": "vitest --ui",
+		"prepublishOnly": "tsup"
 	},
 	"keywords": [
 		"s3",
