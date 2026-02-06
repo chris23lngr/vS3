@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import z from "zod";
 import { createContext } from "../context/create-context";
-import { StorageErrorCode } from "../core/error/codes";
-import { errorSchema } from "../core/error/error";
 import { createStorageMiddleware } from "../middleware";
 import type { Adapter } from "../types/adapter";
 import { router } from "./router";
