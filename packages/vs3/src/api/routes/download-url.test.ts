@@ -11,6 +11,7 @@ const createAdapter = (): Adapter => ({
 	generatePresignedDownloadUrl: vi
 		.fn<Adapter["generatePresignedDownloadUrl"]>()
 		.mockResolvedValue("https://example.com/download"),
+	objectExists: vi.fn<Adapter["objectExists"]>().mockResolvedValue(true),
 	deleteObject: vi.fn(),
 });
 
@@ -204,6 +205,60 @@ describe("download-url route", () => {
 			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
 			message: "Adapter error",
 		});
+	});
+
+	it("throws NOT_FOUND when object does not exist", async () => {
+		const endpoint = createDownloadUrlRoute();
+		const contextOptions = createContextOptions();
+		(
+			contextOptions.adapter.objectExists as ReturnType<typeof vi.fn>
+		).mockResolvedValue(false);
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: { key: "uploads/missing.png" },
+				context: { $options: contextOptions },
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.NOT_FOUND,
+			message: "Object not found.",
+		});
+	});
+
+	it("does not call generatePresignedDownloadUrl when object is missing", async () => {
+		const endpoint = createDownloadUrlRoute();
+		const contextOptions = createContextOptions();
+		(
+			contextOptions.adapter.objectExists as ReturnType<typeof vi.fn>
+		).mockResolvedValue(false);
+
+		try {
+			await callEndpoint(endpoint, {
+				body: { key: "uploads/missing.png" },
+				context: { $options: contextOptions },
+			});
+		} catch {
+			// expected
+		}
+
+		expect(
+			contextOptions.adapter.generatePresignedDownloadUrl,
+		).not.toHaveBeenCalled();
+	});
+
+	it("propagates objectExists adapter errors", async () => {
+		const endpoint = createDownloadUrlRoute();
+		const contextOptions = createContextOptions();
+		(
+			contextOptions.adapter.objectExists as ReturnType<typeof vi.fn>
+		).mockRejectedValue(new Error("S3 service error"));
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: { key: "uploads/photo.png" },
+				context: { $options: contextOptions },
+			}),
+		).rejects.toThrow("S3 service error");
 	});
 
 	it("works with metadata schema provided but not required", async () => {

@@ -81,6 +81,15 @@ export function createDownloadUrlRoute<M extends StandardSchemaV1>(
 				}
 			}
 
+			const exists = await adapter.objectExists(key);
+			if (!exists) {
+				throw new StorageServerError({
+					code: StorageErrorCode.NOT_FOUND,
+					message: "Object not found.",
+					details: { key },
+				});
+			}
+
 			const presigned = await adapter.generatePresignedDownloadUrl(key, {
 				expiresIn,
 				encryption,
