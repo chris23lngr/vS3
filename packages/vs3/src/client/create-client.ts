@@ -6,6 +6,7 @@ import {
 	errorSchema,
 	StorageClientError,
 	StorageError,
+	StorageServerError,
 } from "../core/error/error";
 import { formatFileSize } from "../core/utils/format-file-size";
 import {
@@ -171,6 +172,18 @@ async function executeUploadRequest<M extends StandardSchemaV1>(
 	});
 
 	if (response.error) {
+		const parsed = errorSchema.safeParse(response.error);
+		if (parsed.success) {
+			const ErrorClass =
+				parsed.data.origin === "server" ? StorageServerError : StorageClientError;
+			throw new ErrorClass({
+				code: parsed.data.code,
+				message: parsed.data.message,
+				details: parsed.data.details,
+				httpStatus: parsed.data.httpStatus,
+				recoverySuggestion: parsed.data.recoverySuggestion,
+			});
+		}
 		throw new StorageClientError({
 			code: StorageErrorCode.UNKNOWN_ERROR,
 			details: `${response.error.status}: ${response.error.message ?? "Unknown error"}`,
