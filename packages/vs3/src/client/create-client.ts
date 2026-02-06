@@ -256,6 +256,98 @@ function handleUploadError(
 	throw storageError;
 }
 
+type DownloadRequestInput = {
+	key: string;
+	expiresIn: number | undefined;
+	encryption: S3Encryption | undefined;
+};
+
+async function executeDownloadRequest(
+	$fetch: ReturnType<typeof createFetch>,
+	input: DownloadRequestInput,
+): Promise<DownloadFileResult> {
+	const body: { key: string; expiresIn?: number; encryption?: S3Encryption } = {
+		key: input.key,
+	};
+	if (input.expiresIn !== undefined) {
+		body.expiresIn = input.expiresIn;
+	}
+	if (input.encryption !== undefined) {
+		body.encryption = input.encryption;
+	}
+
+	const response = await $fetch("/download-url", { body });
+
+	if (response.error) {
+		throw new StorageClientError({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			details: `${response.error.status}: ${response.error.message ?? "Unknown error"}`,
+			message: response.error.message ?? "Unknown error",
+		});
+	}
+
+	const parsedResponse = downloadUrlResponseSchema.safeParse(response.data);
+	if (!parsedResponse.success) {
+		throw new StorageClientError({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			message: "Invalid download URL response.",
+			details: parsedResponse.error.flatten().fieldErrors,
+		});
+	}
+
+	const result: DownloadFileResult = {
+		presignedUrl: parsedResponse.data.presignedUrl,
+	};
+
+	if (
+		parsedResponse.data.downloadHeaders &&
+		Object.keys(parsedResponse.data.downloadHeaders).length > 0
+	) {
+		result.downloadHeaders = parsedResponse.data.downloadHeaders;
+	}
+
+	return result;
+}
+
+function dispatchDownloadMode(
+	mode: DownloadMode | undefined,
+	result: DownloadFileResult,
+	key: string,
+): Promise<void> | void {
+	if (mode === "direct-download") {
+		return triggerBrowserDownload(
+			result.presignedUrl,
+			extractFileName(key),
+			result.downloadHeaders,
+		);
+	}
+	if (mode === "preview") {
+		openInBrowserTab(result.presignedUrl);
+	}
+}
+
+function handleDownloadError(
+	error: unknown,
+	onError?: (error: StorageError) => void,
+): never {
+	if (error instanceof StorageError) {
+		onError?.(error);
+		throw error;
+	}
+
+	const storageError = new StorageClientError({
+		code: StorageErrorCode.NETWORK_ERROR,
+		message:
+			error instanceof Error
+				? error.message
+				: "Download URL request failed unexpectedly",
+		details: error instanceof Error ? error.stack : String(error),
+	});
+
+	onError?.(storageError);
+	throw storageError;
+}
+
 async function validateUploadFileInput(
 	input: UploadValidationInput,
 ): Promise<UploadValidationResult> {
@@ -447,74 +539,16 @@ export function createBaseClient<
 			const { expiresIn, encryption, mode, onError, onSuccess } = options ?? {};
 
 			try {
-				const body: { key: string; expiresIn?: number; encryption?: S3Encryption } =
-					{ key };
-				if (expiresIn !== undefined) {
-					body.expiresIn = expiresIn;
-				}
-				if (encryption !== undefined) {
-					body.encryption = encryption;
-				}
-
-				const response = await $fetch("/download-url", { body });
-
-				if (response.error) {
-					throw new StorageClientError({
-						code: StorageErrorCode.UNKNOWN_ERROR,
-						details: `${response.error.status}: ${response.error.message ?? "Unknown error"}`,
-						message: response.error.message ?? "Unknown error",
-					});
-				}
-
-				const parsedResponse = downloadUrlResponseSchema.safeParse(response.data);
-				if (!parsedResponse.success) {
-					throw new StorageClientError({
-						code: StorageErrorCode.UNKNOWN_ERROR,
-						message: "Invalid download URL response.",
-						details: parsedResponse.error.flatten().fieldErrors,
-					});
-				}
-
-				const result: DownloadFileResult = {
-					presignedUrl: parsedResponse.data.presignedUrl,
-				};
-
-				if (
-					parsedResponse.data.downloadHeaders &&
-					Object.keys(parsedResponse.data.downloadHeaders).length > 0
-				) {
-					result.downloadHeaders = parsedResponse.data.downloadHeaders;
-				}
-
-				if (mode === "direct-download") {
-					await triggerBrowserDownload(
-						result.presignedUrl,
-						extractFileName(key),
-						result.downloadHeaders,
-					);
-				} else if (mode === "preview") {
-					openInBrowserTab(result.presignedUrl);
-				}
-
+				const result = await executeDownloadRequest($fetch, {
+					key,
+					expiresIn,
+					encryption,
+				});
+				await dispatchDownloadMode(mode, result, key);
 				onSuccess?.(result);
 				return result;
 			} catch (error) {
-				if (error instanceof StorageError) {
-					onError?.(error);
-					throw error;
-				}
-
-				const storageError = new StorageClientError({
-					code: StorageErrorCode.NETWORK_ERROR,
-					message:
-						error instanceof Error
-							? error.message
-							: "Download URL request failed unexpectedly",
-					details: error instanceof Error ? error.stack : String(error),
-				});
-
-				onError?.(storageError);
-				throw storageError;
+				handleDownloadError(error, onError);
 			}
 		},
 	};
