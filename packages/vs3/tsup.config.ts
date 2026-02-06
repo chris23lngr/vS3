@@ -14,6 +14,7 @@ export default defineConfig({
 		react: "src/client/react/index.ts",
 		"next-js": "src/integrations/next-js.ts",
 		adapters: "src/adapters/index.ts",
+		"aws-s3": "src/adapters/aws-s3/aws-s3.ts",
 	},
 	format: ["esm", "cjs"],
 	dts: true,

@@ -97,6 +97,11 @@ const verifyDualFormat = async (packageJson) => {
 	for (const [exportKey, conditions] of Object.entries(
 		packageJson.exports ?? {},
 	)) {
+		if (typeof conditions === "string") {
+			await stat(path.join(PACKAGE_DIR, conditions.replace(/^\.\//, "")));
+			continue;
+		}
+
 		const importCondition = conditions?.import;
 		const requireCondition = conditions?.require;
 
