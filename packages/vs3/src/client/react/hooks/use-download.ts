@@ -4,6 +4,7 @@ import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import type {
 	BaseStorageClient,
 	DownloadFileResult,
+	DownloadMode,
 } from "../../create-client";
 
 type DownloadStatus = "idle" | "loading" | "success" | "error";
@@ -37,6 +38,7 @@ export function createUseDownload<M extends StandardSchemaV1>(
 				downloadOptions?: Partial<{
 					expiresIn: number;
 					encryption: S3Encryption;
+					mode: DownloadMode;
 				}>,
 			) => {
 				try {

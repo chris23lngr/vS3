@@ -34,6 +34,7 @@ export function router<O extends StorageOptions>(
 		routerContext: {
 			options,
 		},
+		basePath: options.apiPath,
 		onError(e) {
 			if (e instanceof StorageError) {
 				return new Response(JSON.stringify(e.toPayload()), {

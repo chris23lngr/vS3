@@ -19,9 +19,23 @@ import {
 import type { S3Encryption } from "../types/encryption";
 import type { FileInfo } from "../types/file";
 import type { StandardSchemaV1 } from "../types/standard-schema";
+import {
+	extractFileName,
+	openInBrowserTab,
+	triggerBrowserDownload,
+} from "./browser/download";
 import { createFetchSchema } from "./fetch-schema";
 import type { StorageClientOptions } from "./types";
 import { xhrUpload } from "./xhr/upload";
+
+/**
+ * Download mode for the client.
+ *
+ * - `"url"` — returns the presigned URL only (default)
+ * - `"direct-download"` — fetches the file and triggers a browser download
+ * - `"preview"` — opens the file in a new browser tab
+ */
+export type DownloadMode = "url" | "direct-download" | "preview";
 
 type ClientValidationOptions = {
 	maxFileSize: number | undefined;
@@ -425,11 +439,12 @@ export function createBaseClient<
 			options?: Partial<{
 				expiresIn: number;
 				encryption: S3Encryption;
+				mode: DownloadMode;
 				onError: (error: StorageError) => void;
 				onSuccess: (result: DownloadFileResult) => void;
 			}>,
 		): Promise<DownloadFileResult> => {
-			const { expiresIn, encryption, onError, onSuccess } = options ?? {};
+			const { expiresIn, encryption, mode, onError, onSuccess } = options ?? {};
 
 			try {
 				const body: { key: string; expiresIn?: number; encryption?: S3Encryption } =
@@ -469,6 +484,16 @@ export function createBaseClient<
 					Object.keys(parsedResponse.data.downloadHeaders).length > 0
 				) {
 					result.downloadHeaders = parsedResponse.data.downloadHeaders;
+				}
+
+				if (mode === "direct-download") {
+					await triggerBrowserDownload(
+						result.presignedUrl,
+						extractFileName(key),
+						result.downloadHeaders,
+					);
+				} else if (mode === "preview") {
+					openInBrowserTab(result.presignedUrl);
 				}
 
 				onSuccess?.(result);
