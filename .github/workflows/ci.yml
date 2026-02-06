@@ -27,6 +27,9 @@ jobs:
       - name: Activate pnpm
         run: corepack prepare pnpm@10.28.1 --activate
 
+      - name: Ensure pnpm store dir
+        run: mkdir -p .pnpm-store
+
       - name: Cache pnpm store
         uses: actions/cache@v4
         with:
