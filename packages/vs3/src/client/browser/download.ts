@@ -1,10 +1,13 @@
+const DEFAULT_DOWNLOAD_FILENAME = "download";
+
 /**
  * Extracts the file name from an object key (last path segment).
+ * Returns a default filename when the key yields no usable name.
  */
 export function extractFileName(key: string): string {
 	const segments = key.split("/");
 	const lastSegment = segments[segments.length - 1];
-	return lastSegment ?? key;
+	return lastSegment || DEFAULT_DOWNLOAD_FILENAME;
 }
 
 /**

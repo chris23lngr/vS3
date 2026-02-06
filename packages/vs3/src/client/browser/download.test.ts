@@ -14,8 +14,12 @@ describe("extractFileName", () => {
 		expect(extractFileName("uploads/users/photo.png")).toBe("photo.png");
 	});
 
-	it("handles key with trailing slash", () => {
-		expect(extractFileName("uploads/")).toBe("");
+	it("returns default filename for key with trailing slash", () => {
+		expect(extractFileName("uploads/")).toBe("download");
+	});
+
+	it("returns default filename for empty key", () => {
+		expect(extractFileName("")).toBe("download");
 	});
 
 	it("handles key with single segment", () => {
