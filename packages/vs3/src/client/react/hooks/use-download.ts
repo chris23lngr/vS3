@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import type { StorageError } from "../../../core/error/error";
 import type { S3Encryption } from "../../../types/encryption";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import type {
@@ -6,12 +7,13 @@ import type {
 	DownloadFileResult,
 	DownloadMode,
 } from "../../create-client";
+import { normalizeStorageError } from "./storage-error";
 
 type DownloadStatus = "idle" | "loading" | "success" | "error";
 
 type DownloadState = {
 	isLoading: boolean;
-	error: unknown;
+	error: StorageError | null;
 	data: DownloadFileResult | null;
 	status: DownloadStatus;
 };
@@ -20,12 +22,12 @@ type DownloadStateActions = {
 	reset: () => void;
 	setLoading: () => void;
 	setSuccess: (value: DownloadFileResult) => void;
-	setFailure: (value: unknown) => void;
+	setFailure: (value: StorageError) => void;
 };
 
 type DownloadCallbacks = {
 	onSuccess?: (result: DownloadFileResult) => void;
-	onError?: (error: unknown) => void;
+	onError?: (error: StorageError) => void;
 	throwOnError: boolean;
 };
 
@@ -45,7 +47,7 @@ type DownloadOptions = Partial<{
 
 export interface UseDownloadOptions {
 	onSuccess: (result: DownloadFileResult) => void;
-	onError: (error: unknown) => void;
+	onError: (error: StorageError) => void;
 	throwOnError?: boolean;
 }
 
@@ -87,7 +89,7 @@ function useDownloadState(): {
 		setState({ isLoading: false, error: null, data: value, status: "success" });
 	}, []);
 
-	const setFailure = useCallback((value: unknown): void => {
+	const setFailure = useCallback((value: StorageError): void => {
 		setState({ isLoading: false, error: value, data: null, status: "error" });
 	}, []);
 
@@ -110,10 +112,14 @@ async function executeDownload<M extends StandardSchemaV1>(
 		});
 		return result;
 	} catch (error) {
-		actions.setFailure(error);
-		callbacks.onError?.(error);
+		const storageError = normalizeStorageError(
+			error,
+			"Download failed unexpectedly",
+		);
+		actions.setFailure(storageError);
+		callbacks.onError?.(storageError);
 		if (callbacks.throwOnError) {
-			throw error;
+			throw storageError;
 		}
 		return undefined;
 	}
