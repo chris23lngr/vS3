@@ -54,7 +54,6 @@ export function createUseDownload<M extends StandardSchemaV1>(
 					});
 
 					setIsLoading(false);
-					setData(result);
 					return result;
 				} catch (err) {
 					setIsLoading(false);
