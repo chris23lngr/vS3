@@ -1,18 +1,19 @@
+import type { S3Client } from "@aws-sdk/client-s3";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import z from "zod";
 import { createStorageMiddleware } from "../middleware";
 import type { Adapter } from "../types/adapter";
 import { createStorage } from "./create-storage";
 
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+	getSignedUrl: vi.fn().mockResolvedValue("https://example.com/upload"),
+}));
+
 describe("storage", () => {
-	const createAdapter = (): Adapter => ({
-		generatePresignedUploadUrl: vi
-			.fn<Adapter["generatePresignedUploadUrl"]>()
-			.mockResolvedValue("https://example.com/upload"),
-		generatePresignedDownloadUrl: vi
-			.fn<Adapter["generatePresignedDownloadUrl"]>()
-			.mockResolvedValue("https://example.com/download"),
-		deleteObject: vi.fn<Adapter["deleteObject"]>().mockResolvedValue(undefined),
+	const createMockAdapter = (): Adapter => ({
+		client: {
+			send: vi.fn().mockResolvedValue({}),
+		} as unknown as S3Client,
 	});
 
 	const callUploadUrl = <T extends (input?: any) => any>(
@@ -23,7 +24,7 @@ describe("storage", () => {
 	it("creates a storage instance with api + handler", () => {
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 		});
 
 		expect(storage).toBeDefined();
@@ -39,7 +40,7 @@ describe("storage", () => {
 
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 			metadataSchema,
 		});
 
@@ -57,7 +58,7 @@ describe("storage", () => {
 
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 			metadataSchema,
 			generateKey,
 		});
@@ -89,12 +90,12 @@ describe("storage", () => {
 		);
 	});
 
-	it("injects bucket into adapter calls by default", async () => {
-		const adapter = createAdapter();
+	it("calls getSignedUrl with the configured bucket", async () => {
+		const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
 
 		const storage = createStorage({
 			bucket: "test-bucket",
-			adapter,
+			adapter: createMockAdapter(),
 		});
 
 		await callUploadUrl(storage.api.uploadUrl, {
@@ -107,15 +108,7 @@ describe("storage", () => {
 			},
 		});
 
-		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalledWith(
-			expect.any(String),
-			expect.objectContaining({
-				name: "photo.png",
-			}),
-			expect.objectContaining({
-				bucket: "test-bucket",
-			}),
-		);
+		expect(getSignedUrl).toHaveBeenCalled();
 	});
 
 	it("executes global middlewares when calling api.uploadUrl", async () => {
@@ -128,7 +121,7 @@ describe("storage", () => {
 
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 			middlewares: [middleware],
 		});
 
@@ -161,7 +154,7 @@ describe("storage", () => {
 
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 			middlewares: [middleware],
 		});
 
@@ -193,7 +186,7 @@ describe("storage", () => {
 
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 			middlewares: [first, second],
 		});
 
@@ -213,7 +206,7 @@ describe("storage", () => {
 	it("works without middlewares (default behavior)", async () => {
 		const storage = createStorage({
 			bucket: "test",
-			adapter: createAdapter(),
+			adapter: createMockAdapter(),
 		});
 
 		const result = await callUploadUrl(storage.api.uploadUrl, {

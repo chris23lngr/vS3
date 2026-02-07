@@ -10,7 +10,7 @@ import {
 	getObjectKeyValidationIssue,
 	runContentValidators,
 } from "../../core/validation";
-import type { PresignedUploadResult } from "../../types/adapter";
+import type { PresignedUploadResult } from "../../internal/s3-operations.types";
 import type { FileInfo } from "../../types/file";
 import type { StandardSchemaV1 } from "../../types/standard-schema";
 import type { ContentValidatorInput } from "../../types/validation";
@@ -177,12 +177,12 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 			}
 
 			const {
-				adapter,
 				generateKey,
 				maxFileSize,
 				contentValidators,
 				contentValidatorTimeoutMs,
 			} = ctx.context.$options;
+			const operations = ctx.context.$operations;
 			const { fileInfo, acl, expiresIn } = ctx.body;
 			const { encryption } = ctx.body;
 
@@ -216,13 +216,17 @@ export function createUploadUrlRoute<M extends StandardSchemaV1>(
 
 			throwIfIssue(getObjectKeyValidationIssue(key));
 
-			const presigned = await adapter.generatePresignedUploadUrl(key, fileInfo, {
-				expiresIn,
-				contentType: fileInfo.contentType,
-				metadata: transformMetadata(internalMetadata),
-				acl,
-				encryption,
-			});
+			const presigned = await operations.generatePresignedUploadUrl(
+				key,
+				fileInfo,
+				{
+					expiresIn,
+					contentType: fileInfo.contentType,
+					metadata: transformMetadata(internalMetadata),
+					acl,
+					encryption,
+				},
+			);
 
 			const { url, headers } = normalizePresignedUpload(presigned);
 

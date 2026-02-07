@@ -6,8 +6,8 @@ import {
 	type S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import type { Adapter } from "../../types/adapter";
-import { resolveS3EncryptionConfig } from "../s3/encryption";
+import { resolveS3EncryptionConfig } from "../adapters/s3/encryption";
+import type { S3Operations } from "./s3-operations.types";
 
 function isNotFoundError(error: unknown): boolean {
 	if (typeof error !== "object" || error === null) return false;
@@ -24,23 +24,15 @@ function isNotFoundError(error: unknown): boolean {
 	return false;
 }
 
-interface CreateAwsS3AdapterOptions {
+interface CreateS3OperationsOptions {
 	client: S3Client;
-	bucket?: string;
+	resolveBucket: (bucket?: string) => string;
 }
 
-export function createAwsS3Adapter(
-	options: CreateAwsS3AdapterOptions,
-): Adapter {
-	const resolveBucket = (bucket?: string) => {
-		const resolved = bucket ?? options.bucket;
-		if (!resolved) {
-			throw new Error(
-				"AWS S3 adapter requires a bucket. Provide it when creating the adapter or in the request options.",
-			);
-		}
-		return resolved;
-	};
+export function createS3Operations(
+	options: CreateS3OperationsOptions,
+): S3Operations {
+	const { client, resolveBucket } = options;
 
 	return {
 		async generatePresignedUploadUrl(key, fileInfo, requestOptions) {
@@ -76,7 +68,7 @@ export function createAwsS3Adapter(
 				...(encryptionConfig.input ?? {}),
 			});
 
-			const url = await getSignedUrl(options.client, command, { expiresIn });
+			const url = await getSignedUrl(client, command, { expiresIn });
 
 			if (encryptionConfig.headers) {
 				return { url, headers: encryptionConfig.headers };
@@ -84,6 +76,7 @@ export function createAwsS3Adapter(
 
 			return url;
 		},
+
 		async generatePresignedDownloadUrl(key, requestOptions) {
 			const { expiresIn = 3600, bucket, encryption } = requestOptions ?? {};
 			const encryptionConfig =
@@ -93,7 +86,7 @@ export function createAwsS3Adapter(
 				Key: key,
 				...(encryptionConfig.input ?? {}),
 			});
-			const url = await getSignedUrl(options.client, command, { expiresIn });
+			const url = await getSignedUrl(client, command, { expiresIn });
 
 			if (encryptionConfig.headers) {
 				return { url, headers: encryptionConfig.headers };
@@ -101,6 +94,7 @@ export function createAwsS3Adapter(
 
 			return url;
 		},
+
 		async objectExists(key, requestOptions) {
 			const { bucket } = requestOptions ?? {};
 			const command = new HeadObjectCommand({
@@ -108,20 +102,21 @@ export function createAwsS3Adapter(
 				Key: key,
 			});
 			try {
-				await options.client.send(command);
+				await client.send(command);
 				return true;
 			} catch (error) {
 				if (isNotFoundError(error)) return false;
 				throw error;
 			}
 		},
+
 		async deleteObject(key, requestOptions) {
 			const { bucket } = requestOptions ?? {};
 			const command = new DeleteObjectCommand({
 				Bucket: resolveBucket(bucket),
 				Key: key,
 			});
-			await options.client.send(command);
+			await client.send(command);
 		},
 	};
 }

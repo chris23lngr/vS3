@@ -1,3 +1,4 @@
+import type { S3Client } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
 import z from "zod";
 import { createContext } from "../context/create-context";
@@ -5,20 +6,19 @@ import { createStorageMiddleware } from "../middleware";
 import type { Adapter } from "../types/adapter";
 import { router } from "./router";
 
-const createAdapter = (): Adapter => ({
-	generatePresignedUploadUrl: vi
-		.fn<Adapter["generatePresignedUploadUrl"]>()
-		.mockResolvedValue("https://example.com/upload"),
-	generatePresignedDownloadUrl: vi
-		.fn<Adapter["generatePresignedDownloadUrl"]>()
-		.mockResolvedValue("https://example.com/download"),
-	objectExists: vi.fn<Adapter["objectExists"]>().mockResolvedValue(true),
-	deleteObject: vi.fn<Adapter["deleteObject"]>().mockResolvedValue(undefined),
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+	getSignedUrl: vi.fn().mockResolvedValue("https://example.com/upload"),
+}));
+
+const createMockAdapter = (): Adapter => ({
+	client: {
+		send: vi.fn().mockResolvedValue({}),
+	} as unknown as S3Client,
 });
 
 describe("router", () => {
 	it("handles upload-url requests end-to-end", async () => {
-		const adapter = createAdapter();
+		const adapter = createMockAdapter();
 		const options = {
 			bucket: "test-bucket",
 			adapter,
@@ -58,7 +58,7 @@ describe("router", () => {
 	});
 
 	it("returns validation errors for invalid metadata", async () => {
-		const adapter = createAdapter();
+		const adapter = createMockAdapter();
 		const options = {
 			bucket: "test-bucket",
 			adapter,
@@ -92,7 +92,7 @@ describe("router", () => {
 	});
 
 	it("reliably injects context with $options for all requests", async () => {
-		const adapter = createAdapter();
+		const adapter = createMockAdapter();
 		const options = {
 			bucket: "context-test-bucket",
 			adapter,
@@ -127,8 +127,6 @@ describe("router", () => {
 		expect(response.status).toBe(200);
 		expect(data).toHaveProperty("presignedUrl");
 		expect(data).toHaveProperty("key");
-		// Verify the adapter was called (which means context was available)
-		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalled();
 	});
 
 	it("executes middlewares via the HTTP handler path", async () => {
@@ -138,7 +136,7 @@ describe("router", () => {
 			middlewareHandler,
 		);
 
-		const adapter = createAdapter();
+		const adapter = createMockAdapter();
 		const options = {
 			bucket: "test-bucket",
 			adapter,
@@ -176,7 +174,7 @@ describe("router", () => {
 	});
 
 	it("handles download-url requests end-to-end", async () => {
-		const adapter = createAdapter();
+		const adapter = createMockAdapter();
 		const options = {
 			bucket: "test-bucket",
 			adapter,
@@ -199,7 +197,7 @@ describe("router", () => {
 
 		expect(response.status).toBe(200);
 		expect(data).toEqual({
-			presignedUrl: "https://example.com/download",
+			presignedUrl: "https://example.com/upload",
 		});
 	});
 
@@ -208,7 +206,7 @@ describe("router", () => {
 			throw new Error("unauthorized");
 		});
 
-		const adapter = createAdapter();
+		const adapter = createMockAdapter();
 		const options = {
 			bucket: "test-bucket",
 			adapter,

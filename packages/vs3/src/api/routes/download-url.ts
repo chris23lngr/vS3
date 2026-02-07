@@ -5,7 +5,7 @@ import {
 	type FileValidationIssue,
 	getObjectKeyValidationIssue,
 } from "../../core/validation";
-import type { PresignedDownloadResult } from "../../types/adapter";
+import type { PresignedDownloadResult } from "../../internal/s3-operations.types";
 import type { StandardSchemaV1 } from "../../types/standard-schema";
 import { createStorageEndpoint } from "../create-storage-endpoint";
 import { routeRegistry } from "../registry";
@@ -65,7 +65,8 @@ export function createDownloadUrlRoute<M extends StandardSchemaV1>(
 				});
 			}
 
-			const { adapter, hooks } = ctx.context.$options;
+			const { hooks } = ctx.context.$options;
+			const operations = ctx.context.$operations;
 			const { key, expiresIn, encryption } = ctx.body;
 
 			throwIfKeyInvalid(getObjectKeyValidationIssue(key));
@@ -81,7 +82,7 @@ export function createDownloadUrlRoute<M extends StandardSchemaV1>(
 				}
 			}
 
-			const exists = await adapter.objectExists(key);
+			const exists = await operations.objectExists(key);
 			if (!exists) {
 				throw new StorageServerError({
 					code: StorageErrorCode.NOT_FOUND,
@@ -90,7 +91,7 @@ export function createDownloadUrlRoute<M extends StandardSchemaV1>(
 				});
 			}
 
-			const presigned = await adapter.generatePresignedDownloadUrl(key, {
+			const presigned = await operations.generatePresignedDownloadUrl(key, {
 				expiresIn,
 				encryption,
 			});

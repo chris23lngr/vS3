@@ -2,7 +2,9 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import z from "zod";
 import { StorageErrorCode } from "../../core/error/codes";
 import { StorageServerError } from "../../core/error/error";
+import type { S3Operations } from "../../internal/s3-operations.types";
 import type { Adapter } from "../../types/adapter";
+import type { StorageContext } from "../../types/context";
 import type { StorageOptions } from "../../types/options";
 import type { StandardSchemaV1 } from "../../types/standard-schema";
 import { createUploadUrlRoute } from "./upload-url";
@@ -13,13 +15,18 @@ const baseFileInfo = {
 	contentType: "image/png",
 };
 
-const createAdapter = (): Adapter => ({
+const createMockAdapter = (): Adapter => ({ client: {} }) as unknown as Adapter;
+
+const createMockOperations = (
+	overrides?: Partial<S3Operations>,
+): S3Operations => ({
 	generatePresignedUploadUrl: vi
-		.fn<Adapter["generatePresignedUploadUrl"]>()
+		.fn()
 		.mockResolvedValue("https://example.com/upload"),
 	generatePresignedDownloadUrl: vi.fn(),
-	objectExists: vi.fn(),
+	objectExists: vi.fn().mockResolvedValue(true),
 	deleteObject: vi.fn(),
+	...overrides,
 });
 
 type ContextOverrides<M extends StandardSchemaV1> = {
@@ -32,15 +39,21 @@ type ContextOverrides<M extends StandardSchemaV1> = {
 	contentValidatorTimeoutMs?: number;
 };
 
-const createContextOptions = <M extends StandardSchemaV1>(
+const createTestContext = <M extends StandardSchemaV1>(
 	metadataSchema: M,
 	overrides: ContextOverrides<M> = {},
-): StorageOptions<M> => ({
-	bucket: "test-bucket",
-	adapter: createAdapter(),
-	metadataSchema,
-	...overrides,
-});
+): { options: StorageOptions<M>; operations: S3Operations } => {
+	const operations = createMockOperations();
+	return {
+		options: {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+			metadataSchema,
+			...overrides,
+		},
+		operations,
+	};
+};
 
 const callEndpoint = <T extends (input?: any) => any>(
 	endpoint: T,
@@ -55,7 +68,9 @@ describe("upload-url route", () => {
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const generateKey = vi.fn().mockResolvedValue("uploads/abc.png");
-		const contextOptions = createContextOptions(metadataSchema, { generateKey });
+		const { options, operations } = createTestContext(metadataSchema, {
+			generateKey,
+		});
 
 		const result = await callEndpoint(endpoint, {
 			body: {
@@ -65,8 +80,9 @@ describe("upload-url route", () => {
 				},
 			},
 			context: {
-				$options: contextOptions,
-			},
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(result).toEqual({
@@ -86,8 +102,9 @@ describe("upload-url route", () => {
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const generateKey = vi.fn().mockResolvedValue("uploads/xyz.png");
-		const contextOptions = createContextOptions(metadataSchema, { generateKey });
-		const adapter = contextOptions.adapter;
+		const { options, operations } = createTestContext(metadataSchema, {
+			generateKey,
+		});
 
 		await callEndpoint(endpoint, {
 			body: {
@@ -103,11 +120,12 @@ describe("upload-url route", () => {
 				},
 			},
 			context: {
-				$options: contextOptions,
-			},
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
-		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalledWith(
+		expect(operations.generatePresignedUploadUrl).toHaveBeenCalledWith(
 			"uploads/xyz.png",
 			baseFileInfo,
 			expect.objectContaining({
@@ -132,7 +150,9 @@ describe("upload-url route", () => {
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
 		const generateKey = vi.fn().mockResolvedValue("uploads/parsed.png");
-		const contextOptions = createContextOptions(metadataSchema, { generateKey });
+		const { options, operations } = createTestContext(metadataSchema, {
+			generateKey,
+		});
 
 		await callEndpoint(endpoint, {
 			body: {
@@ -142,8 +162,9 @@ describe("upload-url route", () => {
 				},
 			},
 			context: {
-				$options: contextOptions,
-			},
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(generateKey).toHaveBeenCalledWith(baseFileInfo, {
@@ -151,21 +172,25 @@ describe("upload-url route", () => {
 		});
 	});
 
-	it("returns upload headers when adapter provides them", async () => {
+	it("returns upload headers when operations provides them", async () => {
 		const metadataSchema = z.object({
 			userId: z.string(),
 		});
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions(metadataSchema);
-		contextOptions.adapter.generatePresignedUploadUrl = vi
-			.fn()
-			.mockResolvedValue({
+		const operations = createMockOperations({
+			generatePresignedUploadUrl: vi.fn().mockResolvedValue({
 				url: "https://example.com/upload",
 				headers: {
 					"x-amz-server-side-encryption": "AES256",
 				},
-			});
+			}),
+		});
+		const options: StorageOptions<typeof metadataSchema> = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+			metadataSchema,
+		};
 
 		await expect(
 			callEndpoint(endpoint, {
@@ -176,8 +201,9 @@ describe("upload-url route", () => {
 					},
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).resolves.toMatchObject({
 			presignedUrl: "https://example.com/upload",
@@ -251,6 +277,12 @@ describe("upload-url route", () => {
 			contentType: "text/plain",
 		} as unknown as typeof baseFileInfo;
 
+		const { options, operations } = createTestContext(
+			z.object({
+				userId: z.string(),
+			}),
+		);
+
 		await expect(
 			callEndpoint(endpoint, {
 				body: {
@@ -260,12 +292,9 @@ describe("upload-url route", () => {
 					},
 				},
 				context: {
-					$options: createContextOptions(
-						z.object({
-							userId: z.string(),
-						}),
-					),
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			name: "APIError",
@@ -299,7 +328,7 @@ describe("upload-url route", () => {
 		};
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions(metadataSchema);
+		const { options, operations } = createTestContext(metadataSchema);
 
 		await expect(
 			callEndpoint(endpoint, {
@@ -310,8 +339,9 @@ describe("upload-url route", () => {
 					},
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			name: "APIError",
@@ -319,19 +349,25 @@ describe("upload-url route", () => {
 		});
 	});
 
-	it("bubbles adapter errors", async () => {
+	it("bubbles operations errors", async () => {
 		const metadataSchema = z.object({
 			userId: z.string(),
 		});
 		const endpoint = createUploadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions(metadataSchema);
-		contextOptions.adapter.generatePresignedUploadUrl = vi.fn(() => {
-			throw new StorageServerError({
-				code: StorageErrorCode.INTERNAL_SERVER_ERROR,
-				message: "Adapter error",
-				details: "fail",
-			});
+		const operations = createMockOperations({
+			generatePresignedUploadUrl: vi.fn(() => {
+				throw new StorageServerError({
+					code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+					message: "Adapter error",
+					details: "fail",
+				});
+			}),
 		});
+		const options: StorageOptions<typeof metadataSchema> = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+			metadataSchema,
+		};
 
 		await expect(
 			callEndpoint(endpoint, {
@@ -342,8 +378,9 @@ describe("upload-url route", () => {
 					},
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
@@ -353,7 +390,7 @@ describe("upload-url route", () => {
 
 	it("does not require metadata when no metadata schema is provided", async () => {
 		const endpoint = createUploadUrlRoute();
-		const contextOptions = createContextOptions(z.undefined());
+		const { options, operations } = createTestContext(z.undefined());
 
 		await expect(
 			callEndpoint(endpoint, {
@@ -361,8 +398,9 @@ describe("upload-url route", () => {
 					fileInfo: baseFileInfo,
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).resolves.toMatchObject({
 			presignedUrl: "https://example.com/upload",
@@ -392,7 +430,7 @@ describe("upload-url route", () => {
 		});
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions(metadataSchema);
+		const { options, operations } = createTestContext(metadataSchema);
 
 		await expect(
 			callEndpoint(endpoint, {
@@ -401,8 +439,9 @@ describe("upload-url route", () => {
 					metadata: undefined,
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			name: "APIError",
@@ -419,7 +458,7 @@ describe("upload-url route", () => {
 		});
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions(metadataSchema);
+		const { options, operations } = createTestContext(metadataSchema);
 
 		await expect(
 			callEndpoint(endpoint, {
@@ -428,8 +467,9 @@ describe("upload-url route", () => {
 					metadata: null,
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			name: "APIError",
@@ -446,7 +486,7 @@ describe("upload-url route", () => {
 		});
 
 		const endpoint = createUploadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions(metadataSchema);
+		const { options, operations } = createTestContext(metadataSchema);
 
 		// Metadata is required by the registry, but since all fields in the schema
 		// are optional, an empty object {} is valid and should pass validation
@@ -457,8 +497,9 @@ describe("upload-url route", () => {
 					metadata: {},
 				},
 				context: {
-					$options: contextOptions,
-				},
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).resolves.toMatchObject({
 			presignedUrl: "https://example.com/upload",
@@ -472,7 +513,7 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
-			const contextOptions = createContextOptions(metadataSchema, {
+			const { options, operations } = createTestContext(metadataSchema, {
 				allowedFileTypes: ["image/png"],
 			});
 
@@ -485,8 +526,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).resolves.toMatchObject({
 				presignedUrl: "https://example.com/upload",
@@ -499,7 +541,7 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
-			const contextOptions = createContextOptions(metadataSchema, {
+			const { options, operations } = createTestContext(metadataSchema, {
 				allowedFileTypes: ["image/png"],
 			});
 
@@ -517,8 +559,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.FILE_TYPE_NOT_ALLOWED,
@@ -532,7 +575,7 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
-			const contextOptions = createContextOptions(metadataSchema, {
+			const { options, operations } = createTestContext(metadataSchema, {
 				allowedFileTypes: [".png"],
 			});
 
@@ -551,8 +594,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.FILE_TYPE_NOT_ALLOWED,
@@ -566,7 +610,7 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
-			const contextOptions = createContextOptions(metadataSchema);
+			const { options, operations } = createTestContext(metadataSchema);
 
 			const fileInfo = {
 				...baseFileInfo,
@@ -582,8 +626,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.INVALID_FILENAME,
@@ -597,7 +642,7 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
-			const contextOptions = createContextOptions(metadataSchema, {
+			const { options, operations } = createTestContext(metadataSchema, {
 				generateKey: vi.fn().mockResolvedValue("../secret.png"),
 			});
 
@@ -610,8 +655,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.INVALID_FILE_INFO,
@@ -627,8 +673,9 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
+			const { options, operations } = createTestContext(metadataSchema);
 			const contextOptions = {
-				...createContextOptions(metadataSchema),
+				...options,
 				maxFileSize: 1000,
 			};
 
@@ -647,7 +694,8 @@ describe("upload-url route", () => {
 					},
 					context: {
 						$options: contextOptions,
-					},
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).resolves.toMatchObject({
 				presignedUrl: "https://example.com/upload",
@@ -660,8 +708,9 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
+			const { options, operations } = createTestContext(metadataSchema);
 			const contextOptions = {
-				...createContextOptions(metadataSchema),
+				...options,
 				maxFileSize: 1000,
 			};
 
@@ -680,7 +729,8 @@ describe("upload-url route", () => {
 					},
 					context: {
 						$options: contextOptions,
-					},
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).resolves.toMatchObject({
 				presignedUrl: "https://example.com/upload",
@@ -693,8 +743,9 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
+			const { options, operations } = createTestContext(metadataSchema);
 			const contextOptions = {
-				...createContextOptions(metadataSchema),
+				...options,
 				maxFileSize: 1000,
 			};
 
@@ -713,7 +764,8 @@ describe("upload-url route", () => {
 					},
 					context: {
 						$options: contextOptions,
-					},
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.FILE_TOO_LARGE,
@@ -731,7 +783,7 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
-			const contextOptions = createContextOptions(metadataSchema);
+			const { options, operations } = createTestContext(metadataSchema);
 
 			const fileInfo = {
 				...baseFileInfo,
@@ -747,8 +799,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).resolves.toMatchObject({
 				presignedUrl: "https://example.com/upload",
@@ -761,8 +814,9 @@ describe("upload-url route", () => {
 			});
 
 			const endpoint = createUploadUrlRoute(metadataSchema);
+			const { options, operations } = createTestContext(metadataSchema);
 			const contextOptions = {
-				...createContextOptions(metadataSchema),
+				...options,
 				maxFileSize: 5000000,
 			};
 
@@ -782,7 +836,8 @@ describe("upload-url route", () => {
 					},
 					context: {
 						$options: contextOptions,
-					},
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.FILE_TOO_LARGE,
@@ -806,7 +861,7 @@ describe("upload-url route", () => {
 				valid: false,
 				reason: "blocked by policy",
 			});
-			const contextOptions = createContextOptions(metadataSchema, {
+			const { options, operations } = createTestContext(metadataSchema, {
 				contentValidators: [contentValidator],
 			});
 
@@ -819,8 +874,9 @@ describe("upload-url route", () => {
 						},
 					},
 					context: {
-						$options: contextOptions,
-					},
+						$options: options,
+						$operations: operations,
+					} satisfies Omit<StorageContext, "$middleware">,
 				}),
 			).rejects.toMatchObject({
 				code: StorageErrorCode.CONTENT_VALIDATION_ERROR,

@@ -2,26 +2,39 @@ import { describe, expect, it, vi } from "vitest";
 import z from "zod";
 import { StorageErrorCode } from "../../core/error/codes";
 import { StorageServerError } from "../../core/error/error";
+import type { S3Operations } from "../../internal/s3-operations.types";
 import type { Adapter } from "../../types/adapter";
+import type { StorageContext } from "../../types/context";
 import type { StorageOptions } from "../../types/options";
 import { createDownloadUrlRoute } from "./download-url";
 
-const createAdapter = (): Adapter => ({
+const createMockAdapter = (): Adapter => ({ client: {} }) as unknown as Adapter;
+
+const createMockOperations = (
+	overrides?: Partial<S3Operations>,
+): S3Operations => ({
 	generatePresignedUploadUrl: vi.fn(),
 	generatePresignedDownloadUrl: vi
-		.fn<Adapter["generatePresignedDownloadUrl"]>()
+		.fn()
 		.mockResolvedValue("https://example.com/download"),
-	objectExists: vi.fn<Adapter["objectExists"]>().mockResolvedValue(true),
+	objectExists: vi.fn().mockResolvedValue(true),
 	deleteObject: vi.fn(),
+	...overrides,
 });
 
 const createContextOptions = (
 	overrides: Partial<StorageOptions> = {},
-): StorageOptions => ({
-	bucket: "test-bucket",
-	adapter: createAdapter(),
-	...overrides,
-});
+): { options: StorageOptions; operations: S3Operations } => {
+	const operations = createMockOperations();
+	return {
+		options: {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+			...overrides,
+		},
+		operations,
+	};
+};
 
 const callEndpoint = <T extends (input?: any) => any>(
 	endpoint: T,
@@ -31,11 +44,14 @@ const callEndpoint = <T extends (input?: any) => any>(
 describe("download-url route", () => {
 	it("returns a presigned URL for a valid key", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
+		const { options, operations } = createContextOptions();
 
 		const result = await callEndpoint(endpoint, {
 			body: { key: "uploads/photo.png" },
-			context: { $options: contextOptions },
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(result).toEqual({
@@ -43,10 +59,9 @@ describe("download-url route", () => {
 		});
 	});
 
-	it("passes expiresIn and encryption to adapter", async () => {
+	it("passes expiresIn and encryption to operations", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
-		const adapter = contextOptions.adapter;
+		const { options, operations } = createContextOptions();
 
 		await callEndpoint(endpoint, {
 			body: {
@@ -54,10 +69,13 @@ describe("download-url route", () => {
 				expiresIn: 300,
 				encryption: { type: "SSE-S3" },
 			},
-			context: { $options: contextOptions },
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
-		expect(adapter.generatePresignedDownloadUrl).toHaveBeenCalledWith(
+		expect(operations.generatePresignedDownloadUrl).toHaveBeenCalledWith(
 			"uploads/photo.png",
 			expect.objectContaining({
 				expiresIn: 300,
@@ -66,21 +84,27 @@ describe("download-url route", () => {
 		);
 	});
 
-	it("returns downloadHeaders when adapter provides them", async () => {
+	it("returns downloadHeaders when operations provides them", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
-		contextOptions.adapter.generatePresignedDownloadUrl = vi
-			.fn()
-			.mockResolvedValue({
+		const operations = createMockOperations({
+			generatePresignedDownloadUrl: vi.fn().mockResolvedValue({
 				url: "https://example.com/download",
 				headers: {
 					"x-amz-server-side-encryption": "AES256",
 				},
-			});
+			}),
+		});
+		const options: StorageOptions = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+		};
 
 		const result = await callEndpoint(endpoint, {
 			body: { key: "uploads/photo.png" },
-			context: { $options: contextOptions },
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(result).toMatchObject({
@@ -107,7 +131,7 @@ describe("download-url route", () => {
 
 	it("throws FORBIDDEN when beforeDownload hook rejects", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions({
+		const { options, operations } = createContextOptions({
 			hooks: {
 				beforeDownload: vi
 					.fn()
@@ -118,7 +142,10 @@ describe("download-url route", () => {
 		await expect(
 			callEndpoint(endpoint, {
 				body: { key: "uploads/private.png" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			code: StorageErrorCode.FORBIDDEN,
@@ -129,13 +156,16 @@ describe("download-url route", () => {
 	it("calls afterDownload hook after success", async () => {
 		const afterDownload = vi.fn().mockResolvedValue(undefined);
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions({
+		const { options, operations } = createContextOptions({
 			hooks: { afterDownload },
 		});
 
 		await callEndpoint(endpoint, {
 			body: { key: "uploads/photo.png" },
-			context: { $options: contextOptions },
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(afterDownload).toHaveBeenCalledWith("uploads/photo.png");
@@ -143,11 +173,14 @@ describe("download-url route", () => {
 
 	it("works without any hooks configured", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
+		const { options, operations } = createContextOptions();
 
 		const result = await callEndpoint(endpoint, {
 			body: { key: "uploads/photo.png" },
-			context: { $options: contextOptions },
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(result).toEqual({
@@ -157,12 +190,15 @@ describe("download-url route", () => {
 
 	it("rejects keys with path traversal", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
+		const { options, operations } = createContextOptions();
 
 		await expect(
 			callEndpoint(endpoint, {
 				body: { key: "../../../etc/passwd" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			code: StorageErrorCode.INVALID_FILE_INFO,
@@ -173,33 +209,44 @@ describe("download-url route", () => {
 	it("propagates afterDownload hook errors", async () => {
 		const afterDownload = vi.fn().mockRejectedValue(new Error("hook failed"));
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions({
+		const { options, operations } = createContextOptions({
 			hooks: { afterDownload },
 		});
 
 		await expect(
 			callEndpoint(endpoint, {
 				body: { key: "uploads/photo.png" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toThrow("hook failed");
 	});
 
-	it("bubbles adapter errors", async () => {
+	it("bubbles operations errors", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
-		contextOptions.adapter.generatePresignedDownloadUrl = vi.fn(() => {
-			throw new StorageServerError({
-				code: StorageErrorCode.INTERNAL_SERVER_ERROR,
-				message: "Adapter error",
-				details: "fail",
-			});
+		const operations = createMockOperations({
+			generatePresignedDownloadUrl: vi.fn(() => {
+				throw new StorageServerError({
+					code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+					message: "Adapter error",
+					details: "fail",
+				});
+			}),
 		});
+		const options: StorageOptions = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+		};
 
 		await expect(
 			callEndpoint(endpoint, {
 				body: { key: "uploads/photo.png" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
@@ -209,15 +256,21 @@ describe("download-url route", () => {
 
 	it("throws NOT_FOUND when object does not exist", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
-		(
-			contextOptions.adapter.objectExists as ReturnType<typeof vi.fn>
-		).mockResolvedValue(false);
+		const operations = createMockOperations({
+			objectExists: vi.fn().mockResolvedValue(false),
+		});
+		const options: StorageOptions = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+		};
 
 		await expect(
 			callEndpoint(endpoint, {
 				body: { key: "uploads/missing.png" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toMatchObject({
 			code: StorageErrorCode.NOT_FOUND,
@@ -227,36 +280,46 @@ describe("download-url route", () => {
 
 	it("does not call generatePresignedDownloadUrl when object is missing", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
-		(
-			contextOptions.adapter.objectExists as ReturnType<typeof vi.fn>
-		).mockResolvedValue(false);
+		const operations = createMockOperations({
+			objectExists: vi.fn().mockResolvedValue(false),
+		});
+		const options: StorageOptions = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+		};
 
 		try {
 			await callEndpoint(endpoint, {
 				body: { key: "uploads/missing.png" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			});
 		} catch {
 			// expected
 		}
 
-		expect(
-			contextOptions.adapter.generatePresignedDownloadUrl,
-		).not.toHaveBeenCalled();
+		expect(operations.generatePresignedDownloadUrl).not.toHaveBeenCalled();
 	});
 
-	it("propagates objectExists adapter errors", async () => {
+	it("propagates objectExists operations errors", async () => {
 		const endpoint = createDownloadUrlRoute();
-		const contextOptions = createContextOptions();
-		(
-			contextOptions.adapter.objectExists as ReturnType<typeof vi.fn>
-		).mockRejectedValue(new Error("S3 service error"));
+		const operations = createMockOperations({
+			objectExists: vi.fn().mockRejectedValue(new Error("S3 service error")),
+		});
+		const options: StorageOptions = {
+			bucket: "test-bucket",
+			adapter: createMockAdapter(),
+		};
 
 		await expect(
 			callEndpoint(endpoint, {
 				body: { key: "uploads/photo.png" },
-				context: { $options: contextOptions },
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
 			}),
 		).rejects.toThrow("S3 service error");
 	});
@@ -264,11 +327,14 @@ describe("download-url route", () => {
 	it("works with metadata schema provided but not required", async () => {
 		const metadataSchema = z.object({ userId: z.string() });
 		const endpoint = createDownloadUrlRoute(metadataSchema);
-		const contextOptions = createContextOptions({ metadataSchema });
+		const { options, operations } = createContextOptions({ metadataSchema });
 
 		const result = await callEndpoint(endpoint, {
 			body: { key: "uploads/photo.png" },
-			context: { $options: contextOptions },
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
 		});
 
 		expect(result).toEqual({

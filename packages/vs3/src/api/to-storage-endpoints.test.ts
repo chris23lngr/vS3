@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getCurrentStorageContext } from "../context/endpoint-context";
+import type { S3Operations } from "../internal/s3-operations.types";
 import { createStorageMiddleware } from "../middleware";
 import type { StorageMiddleware } from "../middleware/types";
 import type { StorageContext } from "../types/context";
@@ -18,15 +19,19 @@ type TestEndpoint = ((ctx: TestContext) => Promise<unknown>) & {
 	options: { method: "POST" };
 };
 
+const createMockOperations = (): S3Operations => ({
+	generatePresignedUploadUrl: async () => "url",
+	generatePresignedDownloadUrl: async () => "url",
+	objectExists: async () => true,
+	deleteObject: async () => {},
+});
+
 const createStorageContext = (): StorageContext<StorageOptions> => ({
 	$options: {
 		bucket: "test-bucket",
-		adapter: {
-			generatePresignedUploadUrl: async () => "url",
-			generatePresignedDownloadUrl: async () => "url",
-			deleteObject: async () => {},
-		},
+		adapter: { client: {} } as StorageOptions["adapter"],
 	},
+	$operations: createMockOperations(),
 });
 
 const createStorageContextWithMiddlewares = (
@@ -34,13 +39,10 @@ const createStorageContextWithMiddlewares = (
 ): StorageContext<StorageOptions> => ({
 	$options: {
 		bucket: "test-bucket",
-		adapter: {
-			generatePresignedUploadUrl: async () => "url",
-			generatePresignedDownloadUrl: async () => "url",
-			deleteObject: async () => {},
-		},
+		adapter: { client: {} } as StorageOptions["adapter"],
 		middlewares,
 	},
+	$operations: createMockOperations(),
 });
 
 describe("toStorageEndpoints", () => {

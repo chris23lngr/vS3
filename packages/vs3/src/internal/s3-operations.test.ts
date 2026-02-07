@@ -1,6 +1,6 @@
 import { HeadObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { describe, expect, it, vi } from "vitest";
-import { createAwsS3Adapter } from "./aws-s3";
+import { createS3Operations } from "./s3-operations";
 
 function createMockClient(overrides: Partial<S3Client> = {}): S3Client {
 	return {
@@ -9,15 +9,17 @@ function createMockClient(overrides: Partial<S3Client> = {}): S3Client {
 	} as unknown as S3Client;
 }
 
-describe("createAwsS3Adapter", () => {
+const resolveBucket = (bucket?: string): string => bucket ?? "default-bucket";
+
+describe("createS3Operations", () => {
 	describe("objectExists", () => {
 		it("returns true when HeadObject succeeds", async () => {
 			const client = createMockClient({
 				send: vi.fn().mockResolvedValue({}),
 			});
-			const adapter = createAwsS3Adapter({ client, bucket: "my-bucket" });
+			const ops = createS3Operations({ client, resolveBucket });
 
-			const result = await adapter.objectExists("photos/cat.png");
+			const result = await ops.objectExists("photos/cat.png");
 
 			expect(result).toBe(true);
 			expect(client.send).toHaveBeenCalledWith(expect.any(HeadObjectCommand));
@@ -31,9 +33,9 @@ describe("createAwsS3Adapter", () => {
 			const client = createMockClient({
 				send: vi.fn().mockRejectedValue(notFound),
 			});
-			const adapter = createAwsS3Adapter({ client, bucket: "my-bucket" });
+			const ops = createS3Operations({ client, resolveBucket });
 
-			const result = await adapter.objectExists("photos/missing.png");
+			const result = await ops.objectExists("photos/missing.png");
 
 			expect(result).toBe(false);
 		});
@@ -46,9 +48,9 @@ describe("createAwsS3Adapter", () => {
 			const client = createMockClient({
 				send: vi.fn().mockRejectedValue(error),
 			});
-			const adapter = createAwsS3Adapter({ client, bucket: "my-bucket" });
+			const ops = createS3Operations({ client, resolveBucket });
 
-			const result = await adapter.objectExists("photos/missing.png");
+			const result = await ops.objectExists("photos/missing.png");
 
 			expect(result).toBe(false);
 		});
@@ -61,9 +63,9 @@ describe("createAwsS3Adapter", () => {
 			const client = createMockClient({
 				send: vi.fn().mockRejectedValue(forbidden),
 			});
-			const adapter = createAwsS3Adapter({ client, bucket: "my-bucket" });
+			const ops = createS3Operations({ client, resolveBucket });
 
-			await expect(adapter.objectExists("photos/secret.png")).rejects.toThrow(
+			await expect(ops.objectExists("photos/secret.png")).rejects.toThrow(
 				"Forbidden",
 			);
 		});
@@ -72,14 +74,27 @@ describe("createAwsS3Adapter", () => {
 			const client = createMockClient({
 				send: vi.fn().mockResolvedValue({}),
 			});
-			const adapter = createAwsS3Adapter({ client, bucket: "default-bucket" });
+			const ops = createS3Operations({ client, resolveBucket });
 
-			await adapter.objectExists("key.txt", { bucket: "other-bucket" });
+			await ops.objectExists("key.txt", { bucket: "other-bucket" });
 
 			const command = (client.send as ReturnType<typeof vi.fn>).mock
 				.calls[0][0] as HeadObjectCommand;
 			expect(command.input.Bucket).toBe("other-bucket");
 			expect(command.input.Key).toBe("key.txt");
+		});
+
+		it("uses default bucket from resolveBucket", async () => {
+			const client = createMockClient({
+				send: vi.fn().mockResolvedValue({}),
+			});
+			const ops = createS3Operations({ client, resolveBucket });
+
+			await ops.objectExists("key.txt");
+
+			const command = (client.send as ReturnType<typeof vi.fn>).mock
+				.calls[0][0] as HeadObjectCommand;
+			expect(command.input.Bucket).toBe("default-bucket");
 		});
 	});
 });

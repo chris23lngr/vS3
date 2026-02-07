@@ -1,4 +1,12 @@
-export { aws } from "./adapters";
+export {
+	aws,
+	backblazeB2,
+	cloudflareR2,
+	createAdapter,
+	digitaloceanSpaces,
+	minio,
+	wasabi,
+} from "./adapters";
 // Security exports - Request signing and verification
 export {
 	createInMemoryNonceStore,
