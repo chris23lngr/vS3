@@ -1,103 +1,33 @@
+import type { HeadObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { describe, expect, it, vi } from "vitest";
 import type { Adapter } from "../types/adapter";
 import { createContext } from "./create-context";
 
-const fileInfo = {
-	name: "photo.png",
-	size: 123,
-	contentType: "image/png",
-};
+vi.mock("@aws-sdk/s3-request-presigner", () => ({
+	getSignedUrl: vi.fn().mockResolvedValue("https://example.com/presigned"),
+}));
 
-const createAdapter = (): Adapter => ({
-	generatePresignedUploadUrl: vi
-		.fn<Adapter["generatePresignedUploadUrl"]>()
-		.mockResolvedValue("https://example.com/upload"),
-	generatePresignedDownloadUrl: vi
-		.fn<Adapter["generatePresignedDownloadUrl"]>()
-		.mockResolvedValue("https://example.com/download"),
-	deleteObject: vi.fn<Adapter["deleteObject"]>().mockResolvedValue(undefined),
+const createMockAdapter = (): Adapter => ({
+	client: {
+		send: vi.fn().mockResolvedValue({}),
+	} as unknown as S3Client,
 });
 
 describe("createContext", () => {
-	it("injects the default bucket when none is provided (upload)", async () => {
-		const adapter = createAdapter();
-		const ctx = createContext({
-			bucket: "bucket-a",
-			adapter,
-		});
+	it("creates $operations from the adapter client", () => {
+		const adapter = createMockAdapter();
+		const ctx = createContext({ bucket: "bucket-a", adapter });
 
-		await ctx.$options.adapter.generatePresignedUploadUrl("key", fileInfo, {
-			contentType: "image/png",
-		});
-
-		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalledWith(
-			"key",
-			fileInfo,
-			expect.objectContaining({
-				contentType: "image/png",
-				bucket: "bucket-a",
-			}),
-		);
+		expect(ctx.$operations).toBeDefined();
+		expect(ctx.$operations.generatePresignedUploadUrl).toBeTypeOf("function");
+		expect(ctx.$operations.generatePresignedDownloadUrl).toBeTypeOf("function");
+		expect(ctx.$operations.objectExists).toBeTypeOf("function");
+		expect(ctx.$operations.deleteObject).toBeTypeOf("function");
 	});
 
-	it("respects explicit bucket overrides (upload)", async () => {
-		const adapter = createAdapter();
-		const ctx = createContext({
-			bucket: "bucket-a",
-			adapter,
-		});
-
-		await ctx.$options.adapter.generatePresignedUploadUrl("key", fileInfo, {
-			bucket: "bucket-b",
-			expiresIn: 60,
-		});
-
-		expect(adapter.generatePresignedUploadUrl).toHaveBeenCalledWith(
-			"key",
-			fileInfo,
-			expect.objectContaining({
-				expiresIn: 60,
-				bucket: "bucket-b",
-			}),
-		);
-	});
-
-	it("injects bucket for download urls", async () => {
-		const adapter = createAdapter();
-		const ctx = createContext({
-			bucket: "bucket-a",
-			adapter,
-		});
-
-		await ctx.$options.adapter.generatePresignedDownloadUrl("key");
-
-		expect(adapter.generatePresignedDownloadUrl).toHaveBeenCalledWith(
-			"key",
-			expect.objectContaining({
-				bucket: "bucket-a",
-			}),
-		);
-	});
-
-	it("injects bucket for deletes", async () => {
-		const adapter = createAdapter();
-		const ctx = createContext({
-			bucket: "bucket-a",
-			adapter,
-		});
-
-		await ctx.$options.adapter.deleteObject("key");
-
-		expect(adapter.deleteObject).toHaveBeenCalledWith(
-			"key",
-			expect.objectContaining({
-				bucket: "bucket-a",
-			}),
-		);
-	});
-
-	it("preserves other storage options on $options", () => {
-		const adapter = createAdapter();
+	it("preserves storage options on $options", () => {
+		const adapter = createMockAdapter();
 		const ctx = createContext({
 			bucket: "bucket-a",
 			adapter,
@@ -110,5 +40,46 @@ describe("createContext", () => {
 		expect(ctx.$options.maxFileSize).toBe(10);
 		expect(ctx.$options.allowedFileTypes).toEqual(["image/png"]);
 		expect(ctx.$options.baseUrl).toBe("https://example.com");
+	});
+
+	it("operations use getSignedUrl with the adapter client", async () => {
+		const adapter = createMockAdapter();
+		const ctx = createContext({ bucket: "bucket-a", adapter });
+
+		const fileInfo = {
+			name: "photo.png",
+			size: 123,
+			contentType: "image/png",
+		};
+
+		await ctx.$operations.generatePresignedUploadUrl("key", fileInfo);
+
+		expect(getSignedUrl).toHaveBeenCalledWith(
+			adapter.client,
+			expect.anything(),
+			expect.anything(),
+		);
+	});
+
+	it("operations resolve bucket from storage options", async () => {
+		const adapter = createMockAdapter();
+		const ctx = createContext({ bucket: "bucket-a", adapter });
+
+		await ctx.$operations.objectExists("key");
+
+		const sendMock = adapter.client.send as ReturnType<typeof vi.fn>;
+		const command = sendMock.mock.calls[0][0] as HeadObjectCommand;
+		expect(command.input.Bucket).toBe("bucket-a");
+	});
+
+	it("operations allow bucket override", async () => {
+		const adapter = createMockAdapter();
+		const ctx = createContext({ bucket: "bucket-a", adapter });
+
+		await ctx.$operations.objectExists("key", { bucket: "bucket-b" });
+
+		const sendMock = adapter.client.send as ReturnType<typeof vi.fn>;
+		const command = sendMock.mock.calls[0][0] as HeadObjectCommand;
+		expect(command.input.Bucket).toBe("bucket-b");
 	});
 });
