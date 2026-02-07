@@ -1,70 +1,12 @@
-import type z from "zod";
-import type { fileInfoSchema } from "../schemas/file";
-import type { S3Encryption } from "./encryption";
+import type { S3Client } from "@aws-sdk/client-s3";
 
-export type ACL =
-	| "public-read"
-	| "private"
-	| "authenticated-read"
-	| "bucket-owner-full-control"
-	| "bucket-owner-read";
-
-export type PresignedUrlResult =
-	| string
-	| { url: string; headers?: Record<string, string> };
-
-export type PresignedUploadResult = PresignedUrlResult;
-export type PresignedDownloadResult = PresignedUrlResult;
-
+/**
+ * An adapter provides a pre-configured S3Client for a specific
+ * storage provider (AWS, Cloudflare R2, MinIO, etc.).
+ *
+ * All S3 operations are handled centrally by the vs3 core.
+ * The adapter's only responsibility is client configuration.
+ */
 export type Adapter = {
-	/**
-	 * Generated a presigned upload url for a given key.
-	 *
-	 * @throws {StorageServerError} If the adapter fails to generate a presigned upload url.
-	 */
-	generatePresignedUploadUrl(
-		key: string,
-		fileInfo: z.infer<typeof fileInfoSchema>,
-		options?: Partial<{
-			expiresIn: number;
-			contentType: string;
-			acl: ACL;
-			metadata: Record<string, string>;
-			bucket: string;
-			encryption: S3Encryption;
-		}>,
-	): PresignedUploadResult | Promise<PresignedUploadResult>;
-
-	/**
-	 * Generate a presigned download url for a given key.
-	 *
-	 * @param key - The key to generate a presigned download url for.
-	 * @param options - The options for the presigned download url.
-	 */
-	generatePresignedDownloadUrl(
-		key: string,
-		options?: Partial<{
-			expiresIn: number;
-			bucket: string;
-			encryption: S3Encryption;
-		}>,
-	): PresignedDownloadResult | Promise<PresignedDownloadResult>;
-
-	/**
-	 * Check whether an object exists in storage.
-	 */
-	objectExists(
-		key: string,
-		options?: Partial<{ bucket: string }>,
-	): boolean | Promise<boolean>;
-
-	/**
-	 * Delete an object by key.
-	 */
-	deleteObject(
-		key: string,
-		options?: Partial<{
-			bucket: string;
-		}>,
-	): void | Promise<void>;
+	readonly client: S3Client;
 };
