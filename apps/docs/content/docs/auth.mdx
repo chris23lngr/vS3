@@ -61,29 +61,9 @@ The handler can be synchronous or async.
 
 Because the handler is a plain function, you can integrate any auth provider. `vs3` provides dedicated middlewares for the following providers:
 
-- [Clerk](#clerk)
 - [better-auth](#better-auth)
 
 These integrations are just a convenience wrapper around the `createAuthMiddleware` function - they can still be configured like any other middleware.
-
-### Clerk
-
-```ts
-import { createAuthMiddleware } from "vs3";
-
-createAuthMiddleware({
-  handler: async ({ request }) => {
-    const session = await clerk.authenticateRequest(request);
-    if (!session.isSignedIn) {
-      return { authenticated: false, reason: "Not signed in" };
-    }
-    return {
-      authenticated: true,
-      session: { userId: session.userId },
-    };
-  },
-});
-```
 
 ### better-auth
 
@@ -100,7 +80,6 @@ export const storage = createStorage({
     }),
   ]
 })
-
 ```
 
 ## Path filtering
