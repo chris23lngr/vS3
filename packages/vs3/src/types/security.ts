@@ -171,8 +171,13 @@ export type SignRequestConfig = RequestSigningConfig & {
 	authHook: AuthHook;
 
 	/**
-	 * Custom error handler for auth hook failures.
-	 * If not provided, a StorageServerError will be thrown.
+	 * Custom handler invoked when the auth hook rejects a caller.
+	 *
+	 * The handler **must** either:
+	 * - Return a `Response` (which will be thrown as an error response), or
+	 * - Throw its own error directly.
+	 *
+	 * If not provided, a `StorageServerError` with code `UNAUTHORIZED` is thrown.
 	 */
 	onVerificationFailure?: (reason: string, request: Request) => Response | never;
 };

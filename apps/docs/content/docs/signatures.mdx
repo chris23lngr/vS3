@@ -37,8 +37,10 @@ const storage = createStorage({
   signature: {
     secret: process.env.SIGNING_SECRET!,
     requireNonce: true,
+    // This authHook gates the /sign-request route.
+    // It runs BEFORE a signature is issued so only
+    // authenticated callers can obtain signed headers.
     authHook: async ({ request }) => {
-      // Validate the caller, e.g. check a session token
       const token = request.headers.get("authorization");
       if (!token) return { authenticated: false, reason: "Missing token" };
       return { authenticated: true };
@@ -51,12 +53,19 @@ const storage = createStorage({
       requireNonce: true,
       nonceStore: createInMemoryNonceStore(),
       skipPaths: ["/upload-url/health"],
+      // Optional: a separate authHook here runs AFTER signature
+      // verification succeeds, for additional per-request checks.
     }),
   ],
 });
 
 export const { api, handler } = storage;
 ```
+
+The two `authHook` slots serve different purposes:
+
+- **`signature.authHook`** — gates the `/sign-request` route. It runs _before_ a signature is issued to ensure only authenticated callers can obtain signed headers.
+- **`createVerifySignatureMiddleware({ authHook })`** — runs _after_ the HMAC signature is verified on every protected endpoint, for additional per-request authorization (e.g. checking roles or permissions).
 
 Defaults you should know:
 
