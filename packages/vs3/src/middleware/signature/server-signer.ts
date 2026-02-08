@@ -4,14 +4,14 @@ import type {
 	SignatureHeaders,
 } from "../../types/security";
 
-type ServerSignInput = {
+export type ServerSignInput = {
 	method: string;
 	path: string;
 	body?: string;
 	nonce?: string;
 };
 
-type ServerSignResult = {
+export type ServerSignResult = {
 	headers: Record<string, string>;
 	timestamp: number;
 	signature: string;

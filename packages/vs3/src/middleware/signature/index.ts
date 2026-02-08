@@ -1,4 +1,8 @@
-export { createServerRequestSigner } from "./server-signer";
+export {
+	createServerRequestSigner,
+	type ServerSignInput,
+	type ServerSignResult,
+} from "./server-signer";
 export type {
 	VerificationResult,
 	VerifySignatureMiddlewareConfig,

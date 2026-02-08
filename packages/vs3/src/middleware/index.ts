@@ -21,6 +21,8 @@ export { createStorageMiddleware, executeMiddlewareChain } from "./core";
 export {
 	createServerRequestSigner,
 	createVerifySignatureMiddleware,
+	type ServerSignInput,
+	type ServerSignResult,
 	type VerificationResult,
 	type VerifySignatureMiddlewareConfig,
 } from "./signature";

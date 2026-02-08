@@ -36,6 +36,8 @@ export type {
 	MiddlewareHandler,
 	RateLimitConfig,
 	RateLimitStore,
+	ServerSignInput,
+	ServerSignResult,
 	StorageMiddleware,
 	StorageMiddlewareContext,
 	TimeoutConfig,
