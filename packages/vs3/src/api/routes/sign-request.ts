@@ -11,18 +11,38 @@ type SignRequestResponse = {
 	headers: Record<string, string>;
 };
 
-function buildAuthRequest(
-	request: unknown,
-	headers: Headers | undefined,
-	fallbackUrl: string,
-): Request {
-	if (request instanceof Request) {
-		return request;
+function buildFallbackUrl(baseUrl: string, apiPath: string): string {
+	const normalizedBase = baseUrl.replace(/\/+$/, "");
+	const normalizedApi =
+		apiPath && !apiPath.startsWith("/") ? `/${apiPath}` : apiPath;
+	return `${normalizedBase}${normalizedApi}/sign-request`;
+}
+
+function resolveAuthRequest(ctx: {
+	request?: Request | undefined;
+	headers?: Headers | undefined;
+	context: {
+		$options: { baseUrl?: string; apiPath?: string };
+	};
+}): Request {
+	if (ctx.request instanceof Request) {
+		return ctx.request;
 	}
 
-	return new Request(fallbackUrl, {
+	const { baseUrl, apiPath } = ctx.context.$options;
+	if (!baseUrl) {
+		throw new StorageServerError({
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			message: "Cannot resolve auth request.",
+			details:
+				"No Request object was provided and baseUrl is not configured. " +
+				"Either pass a real Request to the endpoint or set baseUrl in createStorage().",
+		});
+	}
+
+	return new Request(buildFallbackUrl(baseUrl, apiPath ?? ""), {
 		method: "POST",
-		headers,
+		headers: ctx.headers,
 	});
 }
 
@@ -75,18 +95,7 @@ export function createSignRequestRoute() {
 				});
 			}
 
-			const baseUrl = (ctx.context.$options.baseUrl ?? "http://localhost").replace(
-				/\/+$/,
-				"",
-			);
-			const apiPath = ctx.context.$options.apiPath ?? "";
-			const normalizedApiPath =
-				apiPath && !apiPath.startsWith("/") ? `/${apiPath}` : apiPath;
-			const authRequest = buildAuthRequest(
-				ctx.request,
-				ctx.headers,
-				`${baseUrl}${normalizedApiPath}/sign-request`,
-			);
+			const authRequest = resolveAuthRequest(ctx);
 			await runAuthHook(
 				authRequest,
 				signatureConfig.authHook,
