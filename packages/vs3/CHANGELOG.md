@@ -1,5 +1,11 @@
 # vs3
 
+## 0.1.0-beta.2
+
+### Minor Changes
+
+- [#57](https://github.com/chris23lngr/vs3/pull/57) [`f1060f9`](https://github.com/chris23lngr/vs3/commit/f1060f91806fae37edc8e61c74c1e78618e32644) Thanks [@chris23lngr](https://github.com/chris23lngr)! - implement new authentication strategy with auth middlewares
+
 ## 0.1.0-beta.1
 
 ### Minor Changes
