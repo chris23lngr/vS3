@@ -65,6 +65,16 @@ export function createSignRequestRoute() {
 				});
 			}
 
+			if (!signatureConfig.authHook) {
+				throw new StorageServerError({
+					code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+					message: "An authHook is required for the /sign-request route.",
+					details:
+						"Provide an authHook in createStorage({ signature: { authHook: ... } }) " +
+						"to authenticate callers before issuing signatures.",
+				});
+			}
+
 			const baseUrl = ctx.context.$options.baseUrl ?? "http://localhost";
 			const apiPath = ctx.context.$options.apiPath ?? "";
 			const authRequest = buildAuthRequest(

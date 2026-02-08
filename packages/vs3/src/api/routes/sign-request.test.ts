@@ -129,6 +129,31 @@ describe("sign-request route", () => {
 		});
 	});
 
+	it("throws INTERNAL_SERVER_ERROR when authHook is missing", async () => {
+		const endpoint = createSignRequestRoute();
+		const operations = createMockOperations();
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					method: "POST",
+					path: "/upload-url",
+				},
+				context: {
+					$options: {
+						bucket: "test-bucket",
+						adapter: createMockAdapter(),
+						signature: { secret: testSecret },
+					},
+					$operations: operations,
+				},
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.INTERNAL_SERVER_ERROR,
+			message: "An authHook is required for the /sign-request route.",
+		});
+	});
+
 	it("throws INTERNAL_SERVER_ERROR when context is missing", async () => {
 		const endpoint = createSignRequestRoute();
 

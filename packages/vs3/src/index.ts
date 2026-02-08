@@ -66,6 +66,7 @@ export type {
 	NonceStore,
 	RequestSigningConfig,
 	SignatureHeaders,
+	SignRequestConfig,
 	SignRequestInput,
 	SignRequestResult,
 	VerificationFailureReason,

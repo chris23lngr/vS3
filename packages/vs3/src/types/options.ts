@@ -1,10 +1,8 @@
-import type {
-	StorageMiddleware,
-	VerifySignatureMiddlewareConfig,
-} from "../middleware";
+import type { StorageMiddleware } from "../middleware";
 import type { Adapter } from "./adapter";
 import type { FileInfo } from "./file";
 import type { BeforeHookResult } from "./hooks";
+import type { SignRequestConfig } from "./security";
 import type { StandardSchemaV1 } from "./standard-schema";
 import type { ContentValidatorInput } from "./validation";
 
@@ -110,9 +108,10 @@ export type StorageOptions<M extends StandardSchemaV1 = StandardSchemaV1> = {
 
 	/**
 	 * Signature configuration used by the built-in sign-request route.
+	 * Requires an `authHook` to authenticate callers before issuing signatures.
 	 * Configure this when you want `/sign-request` to issue headers.
 	 */
-	signature?: VerifySignatureMiddlewareConfig;
+	signature?: SignRequestConfig;
 
 	generateKey?: (
 		fileInfo: FileInfo,
