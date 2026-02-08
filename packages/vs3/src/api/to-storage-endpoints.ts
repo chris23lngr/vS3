@@ -86,6 +86,28 @@ function resolveHeaders(
 	return request.headers;
 }
 
+const SIGN_REQUEST_PATH = "/sign-request";
+const VERIFY_SIGNATURE_MIDDLEWARE = "verify-signature";
+
+/**
+ * Filters out middlewares that must not run for a given endpoint path.
+ * The signature verification middleware is excluded for the /sign-request
+ * route because that route authenticates callers via its own authHook
+ * and would otherwise create a circular dependency (requiring a signature
+ * to obtain a signature).
+ */
+function getApplicableMiddlewares(
+	middlewares: readonly StorageMiddleware[],
+	endpointPath: string,
+): readonly StorageMiddleware[] {
+	if (endpointPath === SIGN_REQUEST_PATH) {
+		return middlewares.filter(
+			(m) => m.config.name !== VERIFY_SIGNATURE_MIDDLEWARE,
+		);
+	}
+	return middlewares;
+}
+
 async function runGlobalMiddlewares(
 	middlewares: readonly StorageMiddleware[],
 	endpointPath: string,
@@ -149,7 +171,10 @@ export function toStorageEndpoints<
 					});
 				}
 
-				const middlewares = storageContext.$options?.middlewares;
+				const allMiddlewares = storageContext.$options?.middlewares;
+				const middlewares = allMiddlewares?.length
+					? getApplicableMiddlewares(allMiddlewares, endpoint.path)
+					: undefined;
 				const middlewareResult = middlewares?.length
 					? await runGlobalMiddlewares(middlewares, endpoint.path, context ?? {})
 					: undefined;
