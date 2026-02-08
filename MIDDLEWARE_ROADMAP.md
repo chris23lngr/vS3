@@ -374,7 +374,7 @@ const m1 = createVerifySignatureMiddleware({ ... });
 
 // Middleware 2 can access previous context and add more
 const m2 = createStorageMiddleware({ name: "m2" }, async (ctx) => {
-  const userId = ctx.context.signature.auth?.userId; // ✅ Type-safe!
+  const userId = ctx.context.auth?.userId; // ✅ Type-safe!
   return { custom: { data: "value" } };
 });
 

@@ -106,7 +106,7 @@ Paths match the route path of the endpoint (e.g. `"/upload-url"` for the upload-
 
 ### Signature verification
 
-`createVerifySignatureMiddleware` checks HMAC signatures (and optional nonces) so only clients that know the secret can call your storage API. It adds `signature` to the context with the verification result and optional auth data.
+`createVerifySignatureMiddleware` checks HMAC signatures (and optional nonces) so only clients that know the secret can call your storage API. It adds `signature` to the context with the verification result.
 
 ```ts
 import {
@@ -121,9 +121,6 @@ createVerifySignatureMiddleware({
   requireNonce: true,
   nonceStore: createInMemoryNonceStore(),
   skipPaths: ["/upload-url/health"],
-  authHook: async (ctx) => {
-    return { userId: ctx.metadata?.userId as string };
-  },
 });
 ```
 
@@ -214,13 +211,13 @@ const addRequestId = createStorageMiddleware(
 // Add to createStorage({ ..., middlewares: [addRequestId, ...] })
 ```
 
-You can read context from previous middlewares (e.g. `ctx.context.signature`) and add new keys. TypeScript will infer the merged context when you use the middleware in your storage's `middlewares` array.
+You can read context from previous middlewares (e.g. `ctx.context.signature` or `ctx.context.auth`) and add new keys. TypeScript will infer the merged context when you use the middleware in your storage's `middlewares` array.
 
 ```ts
 const requireUser = createStorageMiddleware(
   { name: "require-user" },
   async (ctx) => {
-    const userId = ctx.context.signature?.auth?.userId;
+    const userId = ctx.context.auth?.userId;
     if (!userId) throw new Response("Unauthorized", { status: 401 });
     return { userId };
   }
@@ -255,10 +252,10 @@ Public, user-facing APIs for middlewares. All are exported from the `vs3` packag
 
 | Export | Description |
 |--------|-------------|
-| `createVerifySignatureMiddleware(config)` | Middleware that verifies request signature (and optional nonce), runs optional `authHook`, and adds `signature: VerificationResult` to context. |
+| `createVerifySignatureMiddleware(config)` | Middleware that verifies request signature (and optional nonce) and adds `signature: VerificationResult` to context. |
 | `createClientRequestSigner(config)` | Builds a client-side signer for adding signature headers to requests. |
-| `VerificationResult` | `{ verified: true; timestamp: number; nonce?: string; auth?: { userId?: string; metadata?: Record<string, unknown> } }`. |
-| `VerifySignatureMiddlewareConfig` | Extends `RequestSigningConfig` with `nonceStore?`, `authHook?`, `skipPaths?`, `onVerificationFailure?`. |
+| `VerificationResult` | `{ verified: true; timestamp: number; nonce?: string }`. |
+| `VerifySignatureMiddlewareConfig` | Extends `RequestSigningConfig` with `nonceStore?`, `skipPaths?`, `onVerificationFailure?`. |
 
 ### Common middlewares
 
