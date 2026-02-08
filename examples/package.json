@@ -1,0 +1,8 @@
+{
+	"name": "vs3-examples",
+	"private": true,
+	"scripts": {
+		"dev": "pnpm --filter \"./examples/*\" dev",
+		"build": "pnpm --filter \"./examples/*\" build"
+	}
+}
