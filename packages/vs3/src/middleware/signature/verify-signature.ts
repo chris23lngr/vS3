@@ -10,6 +10,13 @@ import type {
 } from "./types";
 import { verifySignedRequest } from "./verify-request";
 
+/**
+ * Canonical name used to identify the signature verification middleware.
+ * Exported so other layers (e.g. the routing layer) can reference it
+ * without duplicating a magic string.
+ */
+export const VERIFY_SIGNATURE_MIDDLEWARE_NAME = "verify-signature" as const;
+
 type SignatureMiddlewareResult = {
 	signature: VerificationResult;
 };
@@ -30,7 +37,7 @@ export function createVerifySignatureMiddleware(
 
 	return createStorageMiddleware(
 		{
-			name: "verify-signature",
+			name: VERIFY_SIGNATURE_MIDDLEWARE_NAME,
 			skipPaths: config.skipPaths,
 		},
 		async (ctx) => {

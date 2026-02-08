@@ -1,0 +1,120 @@
+---
+title: Signatures
+description: Protect storage endpoints with HMAC request signatures and server-side signing.
+---
+
+Signatures in `vs3` authenticate and protect storage API requests. A trusted server signs each request using a shared secret, and the storage middleware verifies that signature before the endpoint runs.
+
+## What signatures do
+
+- Verify the request came from a trusted signer.
+- Detect tampering with method, path, or body.
+- Reject requests outside a time window.
+- Optionally prevent replay attacks with nonces.
+
+The signature is an HMAC over a canonical string composed of:
+
+- HTTP method
+- Request path (e.g. `/upload-url`)
+- Timestamp (Unix milliseconds)
+- Optional nonce
+- SHA-256 hash of the body
+
+## Server setup (verification middleware)
+
+Add signature verification to your storage:
+
+```ts
+import {
+  createStorage,
+  createVerifySignatureMiddleware,
+  createInMemoryNonceStore,
+} from "vs3";
+
+const storage = createStorage({
+  bucket: "my-bucket",
+  adapter: myAdapter,
+  signature: {
+    secret: process.env.SIGNING_SECRET!,
+    requireNonce: true,
+    // This authHook gates the /sign-request route.
+    // It runs BEFORE a signature is issued so only
+    // authenticated callers can obtain signed headers.
+    authHook: async ({ request }) => {
+      const token = request.headers.get("authorization");
+      if (!token) return { authenticated: false, reason: "Missing token" };
+      return { authenticated: true };
+    },
+  },
+  middlewares: [
+    createVerifySignatureMiddleware({
+      secret: process.env.SIGNING_SECRET!,
+      timestampToleranceMs: 300_000,
+      requireNonce: true,
+      nonceStore: createInMemoryNonceStore(),
+      skipPaths: ["/upload-url/health"],
+      // Optional: a separate authHook here runs AFTER signature
+      // verification succeeds, for additional per-request checks.
+    }),
+  ],
+});
+
+export const { api, handler } = storage;
+```
+
+The two `authHook` slots serve different purposes:
+
+- **`signature.authHook`** — gates the `/sign-request` route. It runs _before_ a signature is issued to ensure only authenticated callers can obtain signed headers.
+- **`createVerifySignatureMiddleware({ authHook })`** — runs _after_ the HMAC signature is verified on every protected endpoint, for additional per-request authorization (e.g. checking roles or permissions).
+
+Defaults you should know:
+
+- `algorithm`: `"SHA-256"`
+- `timestampToleranceMs`: `300_000` (5 minutes)
+- `requireNonce`: `false`
+- `nonceTtlMs`: `600_000` (10 minutes)
+
+## Built-in signing route
+
+Never send your signing secret to a browser. `vs3` provides a built-in signing route at `/sign-request` when `signature` is configured.
+
+The `signature` option requires an `authHook` that validates the caller before issuing a signature. Without it, anyone could request valid signatures and bypass your protection.
+
+The `/sign-request` route is automatically excluded from the signature verification middleware, so you do not need to add it to `skipPaths`. It authenticates callers through its own `authHook` instead.
+
+```ts
+const response = await fetch("/api/storage/sign-request", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: "Bearer <session-token>",
+  },
+  body: JSON.stringify({
+    method: "POST",
+    path: "/upload-url",
+    body: JSON.stringify({ fileInfo: { name: "notes.txt" } }),
+  }),
+});
+
+const { headers } = await response.json();
+```
+
+Your client should call `/sign-request`, then attach the returned headers to the storage API request.
+
+## Required headers
+
+- `x-signature`
+- `x-timestamp`
+- `x-nonce` when `requireNonce` is enabled
+
+## Error cases
+
+Verification fails when:
+
+- The signature header is missing.
+- The timestamp header is missing, invalid, or expired.
+- A nonce is required but missing.
+- A nonce is reused or the nonce store is missing.
+- The signature does not match the request details.
+
+Use `onVerificationFailure` in the middleware config to return a custom response on failures.

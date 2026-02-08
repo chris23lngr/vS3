@@ -2,7 +2,21 @@ import { createRequestSigner } from "../../core/security/request-signer";
 import type {
 	RequestSigningConfig,
 	SignatureHeaders,
+	SignRequestInput,
 } from "../../types/security";
+
+/**
+ * Input for the server-side signer.
+ * Derived from {@link SignRequestInput} but omits `timestamp` because the
+ * server signer always uses the current time.
+ */
+export type ServerSignInput = Omit<SignRequestInput, "timestamp">;
+
+export type ServerSignResult = {
+	headers: Record<string, string>;
+	timestamp: number;
+	signature: string;
+};
 
 function headersToRecord(headers: SignatureHeaders): Record<string, string> {
 	const record: Record<string, string> = {
@@ -16,24 +30,16 @@ function headersToRecord(headers: SignatureHeaders): Record<string, string> {
 }
 
 /**
- * Creates a client-side request signer that can be used to sign outgoing requests.
+ * Creates a server-side request signer for trusted environments only.
+ * Do not use this in browsers or untrusted clients.
  */
-export function createClientRequestSigner(config: RequestSigningConfig): {
-	sign: (input: {
-		method: string;
-		path: string;
-		body?: string;
-		nonce?: string;
-	}) => Promise<{
-		headers: Record<string, string>;
-		timestamp: number;
-		signature: string;
-	}>;
+export function createServerRequestSigner(config: RequestSigningConfig): {
+	sign: (input: ServerSignInput) => Promise<ServerSignResult>;
 } {
 	const signer = createRequestSigner(config);
 
 	return {
-		sign: async (input) => {
+		sign: async (input: ServerSignInput): Promise<ServerSignResult> => {
 			const result = await signer.sign({
 				method: input.method,
 				path: input.path,

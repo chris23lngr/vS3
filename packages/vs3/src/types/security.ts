@@ -157,3 +157,27 @@ export type AuthHookResult =
 export type AuthHook = (
 	context: AuthHookContext,
 ) => AuthHookResult | Promise<AuthHookResult>;
+
+/**
+ * Configuration for the built-in `/sign-request` route.
+ * Extends the base signing config with a required auth hook
+ * to prevent unauthenticated access to the signing endpoint.
+ */
+export type SignRequestConfig = RequestSigningConfig & {
+	/**
+	 * Auth hook that validates the caller before issuing a signature.
+	 * Required to prevent unauthenticated access to the signing endpoint.
+	 */
+	authHook: AuthHook;
+
+	/**
+	 * Custom handler invoked when the auth hook rejects a caller.
+	 *
+	 * The handler **must** either:
+	 * - Return a `Response` (which will be thrown as an error response), or
+	 * - Throw its own error directly.
+	 *
+	 * If not provided, a `StorageServerError` with code `UNAUTHORIZED` is thrown.
+	 */
+	onVerificationFailure?: (reason: string, request: Request) => Response | never;
+};

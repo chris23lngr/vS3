@@ -29,8 +29,13 @@ export type VerifySignatureMiddlewareConfig = RequestSigningConfig & {
 	skipPaths?: string[];
 
 	/**
-	 * Custom error handler for verification failures.
-	 * If not provided, a StorageServerError will be thrown.
+	 * Custom handler invoked when signature verification or the auth hook fails.
+	 *
+	 * The handler **must** either:
+	 * - Return a `Response` (which will be thrown as an error response), or
+	 * - Throw its own error directly.
+	 *
+	 * If not provided, a `StorageServerError` is thrown with an appropriate code.
 	 */
 	onVerificationFailure?: (reason: string, request: Request) => Response | never;
 };

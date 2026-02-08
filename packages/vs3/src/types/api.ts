@@ -1,6 +1,7 @@
 import type { S3Encryption } from "./encryption";
 import type { FileInfo } from "./file";
 import type { StorageOptions } from "./options";
+import type { SignRequestConfig } from "./security";
 import type { StandardSchemaV1 } from "./standard-schema";
 
 /**
@@ -61,4 +62,15 @@ export type StorageAPI<O extends StorageOptions> = {
 		{ key: string; expiresIn?: number; encryption?: S3Encryption },
 		{ presignedUrl: string; downloadHeaders?: Record<string, string> }
 	>;
+
+	/**
+	 * Generate signature headers for a storage API request.
+	 * Available when signature configuration is provided.
+	 */
+	signRequest?: O["signature"] extends SignRequestConfig
+		? APIMethod<
+				{ method: string; path: string; body?: string },
+				{ headers: Record<string, string> }
+			>
+		: never;
 };
