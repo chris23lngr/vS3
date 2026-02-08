@@ -2,6 +2,7 @@ import type { EndpointContext, InputContext } from "better-call";
 import { runWithEndpointContext } from "../context/endpoint-context";
 import { StorageErrorCode } from "../core/error/codes";
 import { StorageServerError } from "../core/error/error";
+import { VERIFY_SIGNATURE_MIDDLEWARE_NAME } from "../middleware";
 import { executeMiddlewareChain } from "../middleware/core/execute-chain";
 import type {
 	StorageMiddleware,
@@ -87,7 +88,6 @@ function resolveHeaders(
 }
 
 const SIGN_REQUEST_PATH = "/sign-request";
-const VERIFY_SIGNATURE_MIDDLEWARE = "verify-signature";
 
 /**
  * Filters out middlewares that must not run for a given endpoint path.
@@ -102,7 +102,7 @@ function getApplicableMiddlewares(
 ): readonly StorageMiddleware[] {
 	if (endpointPath === SIGN_REQUEST_PATH) {
 		return middlewares.filter(
-			(m) => m.config.name !== VERIFY_SIGNATURE_MIDDLEWARE,
+			(m) => m.config.name !== VERIFY_SIGNATURE_MIDDLEWARE_NAME,
 		);
 	}
 	return middlewares;

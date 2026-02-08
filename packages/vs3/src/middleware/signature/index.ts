@@ -7,4 +7,7 @@ export type {
 	VerificationResult,
 	VerifySignatureMiddlewareConfig,
 } from "./types";
-export { createVerifySignatureMiddleware } from "./verify-signature";
+export {
+	createVerifySignatureMiddleware,
+	VERIFY_SIGNATURE_MIDDLEWARE_NAME,
+} from "./verify-signature";

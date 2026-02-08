@@ -23,6 +23,7 @@ export {
 	createVerifySignatureMiddleware,
 	type ServerSignInput,
 	type ServerSignResult,
+	VERIFY_SIGNATURE_MIDDLEWARE_NAME,
 	type VerificationResult,
 	type VerifySignatureMiddlewareConfig,
 } from "./signature";
