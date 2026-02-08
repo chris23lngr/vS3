@@ -106,17 +106,10 @@ describe("createAuthMiddleware", () => {
 			const request = createRequest();
 			const ctx = createMiddlewareContext(request);
 
-			await expect(middleware.handler(ctx)).rejects.toThrow(StorageServerError);
-
-			try {
-				await middleware.handler(ctx);
-			} catch (error) {
-				expect(error).toBeInstanceOf(StorageServerError);
-				expect((error as StorageServerError).code).toBe(
-					StorageErrorCode.UNAUTHORIZED,
-				);
-				expect((error as StorageServerError).message).toBe("Invalid token");
-			}
+			const err = await middleware.handler(ctx).catch((e: unknown) => e);
+			expect(err).toBeInstanceOf(StorageServerError);
+			expect((err as StorageServerError).code).toBe(StorageErrorCode.UNAUTHORIZED);
+			expect((err as StorageServerError).message).toBe("Invalid token");
 		});
 
 		it("uses default message when no reason is provided", async () => {
@@ -126,15 +119,9 @@ describe("createAuthMiddleware", () => {
 			const request = createRequest();
 			const ctx = createMiddlewareContext(request);
 
-			await expect(middleware.handler(ctx)).rejects.toThrow(StorageServerError);
-
-			try {
-				await middleware.handler(ctx);
-			} catch (error) {
-				expect((error as StorageServerError).message).toBe(
-					"Authentication failed.",
-				);
-			}
+			const err = await middleware.handler(ctx).catch((e: unknown) => e);
+			expect(err).toBeInstanceOf(StorageServerError);
+			expect((err as StorageServerError).message).toBe("Authentication failed.");
 		});
 	});
 
