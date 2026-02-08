@@ -47,7 +47,17 @@
 				"default": "./dist/adapters.cjs"
 			}
 		},
-		"./package.json": "./package.json"
+		"./package.json": "./package.json",
+		"./middleware/auth": {
+			"import": {
+				"types": "./dist/middleware-auth.d.ts",
+				"default": "./dist/middleware-auth.js"
+			},
+			"require": {
+				"types": "./dist/middleware-auth.d.cts",
+				"default": "./dist/middleware-auth.cjs"
+			}
+		}
 	},
 	"files": [
 		"dist"
@@ -63,6 +73,9 @@
 			],
 			"adapters": [
 				"./dist/adapters.d.ts"
+			],
+			"middleware/auth": [
+				"./dist/middleware-auth.d.ts"
 			]
 		}
 	},
@@ -107,6 +120,7 @@
 		"@types/react": "^18.3.27",
 		"@vitest/coverage-v8": "4.0.18",
 		"@vitest/ui": "^4.0.18",
+		"better-auth": "^1.4.18",
 		"react": "^19.2.4",
 		"tsup": "^8.5.1",
 		"typescript": "^5.9.3",

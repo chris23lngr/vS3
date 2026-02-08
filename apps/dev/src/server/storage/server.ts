@@ -44,6 +44,7 @@ export const storage = createStorage({
 		userId: z.string(),
 		orgId: z.string().optional(),
 	}),
+	maxFileSize: 10 * 1024 * 1024,
 });
 
 export const MetadataSchema = storage.$Infer.metadata;
