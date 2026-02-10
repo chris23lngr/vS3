@@ -2,7 +2,6 @@
 
 import type { TableOfContents } from "fumadocs-core/toc";
 import { ListEndIcon } from "lucide-react";
-import Link from "next/link";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +22,8 @@ function collectHeadings(toc: TableOfContents): HeadingRef[] {
 function computeActiveUrls(headings: HeadingRef[]): Set<string> {
 	const scrollY = window.scrollY;
 	const viewportBottom = scrollY + window.innerHeight;
-	const topOffset = 100;
+	/** Pixels below viewport top a section must reach to count as "active". */
+	const activeThresholdPx = 100;
 	const active = new Set<string>();
 
 	for (let i = 0; i < headings.length; i++) {
@@ -34,7 +34,7 @@ function computeActiveUrls(headings: HeadingRef[]): Set<string> {
 			? nextEl.getBoundingClientRect().top + scrollY
 			: document.documentElement.scrollHeight;
 
-		if (headingTop < viewportBottom && sectionEnd > scrollY + topOffset) {
+		if (headingTop < viewportBottom && sectionEnd > scrollY + activeThresholdPx) {
 			active.add(url);
 		}
 	}
@@ -97,20 +97,21 @@ export function DocsToc({ toc }: { toc: TableOfContents }): ReactElement {
 			<ul className="flex flex-col">
 				{toc.map((item) => (
 					<li key={item.url}>
-						<Link
+						<a
 							className={cn(
-								"line-clamp-2 block border-l-2 py-1.5 text-sm transition-colors",
+								"block border-l-2 py-1.5 text-sm transition-colors",
 								activeItems.has(item.url)
 									? "border-blue-500 text-blue-600 dark:text-blue-400"
 									: "border-border text-muted-foreground hover:text-foreground",
 							)}
 							href={item.url}
 							style={{
+								/* 2px offset compensates for border-l-2 width */
 								paddingLeft: `${(item.depth - baseDepth + 1) * 16 - 2}px`,
 							}}
 						>
 							<span className="line-clamp-2">{item.title}</span>
-						</Link>
+						</a>
 					</li>
 				))}
 			</ul>

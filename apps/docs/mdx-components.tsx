@@ -22,7 +22,10 @@ export const components = {
 	...Tabs,
 	// ...Callout,
 	h1: ({ children, className, ...props }: React.ComponentProps<"h1">) => (
-		<h1 className={cn("font-bold text-9xl text-red-600", className)} {...props}>
+		<h1
+			className={cn("scroll-mt-24 font-bold text-3xl text-zinc-800", className)}
+			{...props}
+		>
 			{children}
 		</h1>
 	),
@@ -47,19 +50,19 @@ export const components = {
 	),
 	h4: ({ children, className, ...props }: React.ComponentProps<"h4">) => (
 		<h4
-			className={cn("mt-10 mb-4 scroll-mt-16 font-semibold text-base", className)}
+			className={cn("mt-10 mb-4 scroll-mt-24 font-semibold text-base", className)}
 			{...props}
 		>
 			{children}
 		</h4>
 	),
 	h5: ({ children, className, ...props }: React.ComponentProps<"h5">) => (
-		<h5 className={cn("scroll-mt-8 font-bold text-sm", className)} {...props}>
+		<h5 className={cn("scroll-mt-24 font-bold text-sm", className)} {...props}>
 			{children}
 		</h5>
 	),
 	h6: ({ children, className, ...props }: React.ComponentProps<"h6">) => (
-		<h6 className={cn("scroll-mt-4 font-bold text-xs", className)} {...props}>
+		<h6 className={cn("scroll-mt-24 font-bold text-xs", className)} {...props}>
 			{children}
 		</h6>
 	),

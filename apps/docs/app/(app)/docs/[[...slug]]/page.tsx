@@ -81,7 +81,6 @@ export default async function Page(props: {
 		? { previous: null, next: null }
 		: findNeighbour(source.pageTree, page.url);
 
-	doc.toc;
 	return (
 		<div
 			className="flex scroll-mt-24 items-stretch pb-8 text-[1.05rem] sm:text-[15px] xl:w-full"
