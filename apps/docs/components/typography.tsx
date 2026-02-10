@@ -9,6 +9,7 @@ export function PageTitle({
 			className={cn(
 				"max-w-3xl font-semibold text-4xl leading-[1.3]",
 				"bg-linear-to-t from-zinc-900 to-zinc-500 bg-clip-text text-transparent",
+				"dark:from-white dark:to-zinc-400",
 				"bg-position-[0_0] bg-size-[100%_1.3em] bg-repeat-y",
 				className,
 			)}

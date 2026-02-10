@@ -2,6 +2,7 @@ import Link from "next/link";
 import type React from "react";
 import type { JSX } from "react";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "./theme-toggle";
 
 export function SiteNav({
 	className,
@@ -31,6 +32,7 @@ export function SiteNav({
 					</Link>
 				))}
 			</div>
+			<ThemeToggle className="ms-4" />
 		</nav>
 	);
 }
