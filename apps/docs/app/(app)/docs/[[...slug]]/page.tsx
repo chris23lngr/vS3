@@ -2,8 +2,11 @@ import { findNeighbour } from "fumadocs-core/page-tree";
 import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
+import { DocsFooter } from "@/components/docs-footer";
 import { PageDescription, PageTitle } from "@/components/typography";
 import { Button } from "@/components/ui/button";
+import { SiteConfig } from "@/lib/config";
 import { source } from "@/lib/source";
 import { components } from "@/mdx-components";
 
@@ -94,32 +97,12 @@ export default async function Page(props: {
 								<PageTitle className="scroll-m-24">{doc.title}</PageTitle>
 								<div className="docs-nav flex items-center gap-2">
 									<div className="ml-auto flex gap-2">
-										{neighbours.previous && (
-											<Button
-												className="extend-touch-target size-8 shadow-none md:size-7"
-												render={
-													<Link href={neighbours.previous.url}>
-														<ArrowLeftIcon />
-														<span className="sr-only">Previous</span>
-													</Link>
-												}
-												size="icon"
-												variant="secondary"
-											/>
-										)}
-										{neighbours.next && (
-											<Button
-												className="extend-touch-target size-8 shadow-none md:size-7"
-												render={
-													<Link href={neighbours.next.url}>
-														<ArrowRightIcon />
-														<span className="sr-only">Next</span>
-													</Link>
-												}
-												size="icon"
-												variant="secondary"
-											/>
-										)}
+										<LLMCopyButton markdownUrl={`${page.url}.mdx`} />
+										<ViewOptions
+											githubUrl={`https://github.com/${SiteConfig.repository.owner}/${SiteConfig.repository.name}/blob/${SiteConfig.repository.defaultBranch}/docs/content/docs/${page.path}`}
+											// update it to match your repo
+											markdownUrl={`${page.url}.mdx`}
+										/>
 									</div>
 								</div>
 							</div>
@@ -133,31 +116,33 @@ export default async function Page(props: {
 						<div></div>
 						<div></div>
 					</div>
-					<div className="hidden h-16 w-full items-center gap-2 px-4 sm:flex sm:px-0">
-						{neighbours.previous && (
-							<Button
-								className="shadow-none"
-								render={
-									<Link href={neighbours.previous.url}>
-										<ArrowLeftIcon /> {neighbours.previous.name}
-									</Link>
-								}
-								size="sm"
-								variant="secondary"
-							/>
-						)}
-						{neighbours.next && (
-							<Button
-								className="shadow-none"
-								render={
-									<Link href={neighbours.next.url}>
-										<ArrowRightIcon /> {neighbours.next.name}
-									</Link>
-								}
-								size="sm"
-								variant="secondary"
-							/>
-						)}
+					<div className="grid grid-cols-2 gap-8">
+						<div className="flex items-start justify-start">
+							{neighbours.previous && (
+								<Button
+									className="shadow-none"
+									render={
+										<Link href={neighbours.previous.url}>
+											<ArrowLeftIcon /> {neighbours.previous.name}
+										</Link>
+									}
+									variant={"outline"}
+								/>
+							)}
+						</div>
+						<div className="flex items-start justify-end">
+							{neighbours.next && (
+								<Button
+									className="shadow-none"
+									render={
+										<Link href={neighbours.next.url}>
+											<ArrowRightIcon /> {neighbours.next.name}
+										</Link>
+									}
+									variant={"outline"}
+								/>
+							)}
+						</div>
 					</div>
 				</div>
 			</div>
