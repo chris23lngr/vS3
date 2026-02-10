@@ -3,7 +3,6 @@ import {
 	CircleIcon,
 	KeyIcon,
 	LockIcon,
-	PackageIcon,
 	ShieldCheckIcon,
 } from "lucide-react";
 import Image from "next/image";
