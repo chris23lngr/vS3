@@ -9,7 +9,7 @@ export function DocsFooter({
 }: React.ComponentProps<"footer">) {
 	return (
 		<footer
-			className={cn("border-zinc-200 border-t py-8", className)}
+			className={cn("border-border border-t py-8", className)}
 			data-slot="docs-footer"
 			{...props}
 		>

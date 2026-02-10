@@ -124,7 +124,7 @@ export const components = {
 			return (
 				<code
 					className={cn(
-						"mx-0.5 rounded-md border border-zinc-200 bg-background px-1.5 py-0.5 font-mono text-sm shadow-xs",
+						"mx-0.5 rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-sm shadow-xs",
 					)}
 					{...props}
 				>

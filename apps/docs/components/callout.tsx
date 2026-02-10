@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const calloutVariants = cva(
-	"my-8 flex gap-5 rounded-xl border border-zinc-200 p-4 shadow-xs first:mt-0 last:mb-0 [&_p]:last:mb-0",
+	"my-8 flex gap-5 rounded-xl border border-border p-4 shadow-xs first:mt-0 last:mb-0 [&_p]:last:mb-0",
 	{
 		variants: {
 			type: {

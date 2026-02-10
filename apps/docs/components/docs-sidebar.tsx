@@ -48,7 +48,7 @@ export function DocsSidebar({
 
 	return (
 		<Sidebar
-			className="sticky top-0 h-svh border-zinc-200 border-r border-dashed bg-transparent"
+			className="sticky top-0 h-svh border-border border-r border-dashed bg-transparent"
 			collapsible="none"
 			{...props}
 		>
