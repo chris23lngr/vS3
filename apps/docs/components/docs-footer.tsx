@@ -39,6 +39,7 @@ export function DocsFooter({
 					<Link
 						className="font-medium text-sm text-zinc-700 hover:text-violet-600"
 						href={SiteConfig.repository.url}
+						target="_blank"
 					>
 						GitHub
 					</Link>

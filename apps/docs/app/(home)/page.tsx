@@ -58,7 +58,11 @@ export default function HomePage() {
 							/>
 							<Button
 								nativeButton={false}
-								render={<Link href={SiteConfig.repository.url}>Star on GitHub</Link>}
+								render={
+									<Link href={SiteConfig.repository.url} target="_blank">
+										Star on GitHub
+									</Link>
+								}
 								variant="outline"
 							/>
 						</div>
@@ -190,6 +194,7 @@ export default function HomePage() {
 						<Link
 							className="font-medium text-sm text-zinc-700 hover:text-violet-600"
 							href={SiteConfig.repository.url}
+							target="_blank"
 						>
 							GitHub
 						</Link>
