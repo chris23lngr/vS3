@@ -119,7 +119,7 @@
 
 /* Dark scrollbar (always dark, independent of system/light mode) */
 .scrollbar-dark {
-	scrollbar-color: rgb(82 82 91) rgba(63 63 70 / 0); /* zinc-600 thumb, zinc-800 track */
+	scrollbar-color: rgb(82 82 91) transparent;
 	scrollbar-gutter: stable;
 	scrollbar-width: thin;
 }
@@ -128,7 +128,7 @@
 	width: 8px;
 }
 .scrollbar-dark::-webkit-scrollbar-track {
-	background: rgb(63 63 70); /* zinc-800 */
+	background: transparent;
 	border-radius: 4px;
 }
 .scrollbar-dark::-webkit-scrollbar-thumb {
