@@ -12,6 +12,7 @@ export default defineConfig({
 	entry: {
 		index: "src/index.ts",
 		react: "src/client/react/index.ts",
+		vue: "src/client/vue/index.ts",
 		"next-js": "src/integrations/next-js.ts",
 		adapters: "src/adapters/index.ts",
 		"middleware-auth": "src/middleware/auth/index.ts",

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { type Ref, readonly, ref } from "vue";
 import type { StorageError } from "../../../core/error/error";
 import type { S3Encryption } from "../../../types/encryption";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
@@ -8,7 +8,7 @@ import type {
 	DownloadMode,
 } from "../../create-client";
 import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
-import { normalizeStorageError } from "./storage-error";
+import { normalizeStorageError } from "../../shared/storage-error";
 
 type DownloadStatus = "idle" | "loading" | "success" | "error";
 
@@ -19,12 +19,11 @@ type DownloadState = {
 	status: DownloadStatus;
 };
 
-type DownloadStateActions = {
-	reset: () => void;
-	setLoading: () => void;
-	setSuccess: (value: DownloadFileResult) => void;
-	setFailure: (value: StorageError) => void;
-};
+type DownloadOptions = Partial<{
+	expiresIn: number;
+	encryption: S3Encryption;
+	mode: DownloadMode;
+}>;
 
 type DownloadCallbacks = {
 	onSuccess?: (result: DownloadFileResult) => void;
@@ -32,19 +31,20 @@ type DownloadCallbacks = {
 	throwOnError: boolean;
 };
 
+type DownloadActions = {
+	reset: () => void;
+	setLoading: () => void;
+	setSuccess: (value: DownloadFileResult) => void;
+	setFailure: (value: StorageError) => void;
+};
+
 type DownloadExecution<M extends StandardSchemaV1> = {
 	client: BaseStorageClient<M>;
 	key: string;
 	downloadOptions?: DownloadOptions;
-	actions: DownloadStateActions;
+	actions: DownloadActions;
 	callbacks: DownloadCallbacks;
 };
-
-type DownloadOptions = Partial<{
-	expiresIn: number;
-	encryption: S3Encryption;
-	mode: DownloadMode;
-}>;
 
 export interface UseDownloadOptions {
 	onSuccess?: (result: DownloadFileResult) => void;
@@ -53,7 +53,7 @@ export interface UseDownloadOptions {
 }
 
 type UseDownloadReturn = {
-	state: DownloadState;
+	state: Readonly<Ref<DownloadState>>;
 	download: (
 		key: string,
 		downloadOptions?: DownloadOptions,
@@ -70,29 +70,35 @@ const initialDownloadState: DownloadState = {
 	status: "idle",
 };
 
-function useDownloadState(): {
-	state: DownloadState;
-	actions: DownloadStateActions;
-} {
-	const [state, setState] = useState<DownloadState>(initialDownloadState);
-
-	const reset = useCallback((): void => {
-		setState(initialDownloadState);
-	}, []);
-
-	const setLoading = useCallback((): void => {
-		setState({ ...initialDownloadState, isLoading: true, status: "loading" });
-	}, []);
-
-	const setSuccess = useCallback((value: DownloadFileResult): void => {
-		setState({ isLoading: false, error: null, data: value, status: "success" });
-	}, []);
-
-	const setFailure = useCallback((value: StorageError): void => {
-		setState({ isLoading: false, error: value, data: null, status: "error" });
-	}, []);
-
-	return { state, actions: { reset, setLoading, setSuccess, setFailure } };
+function createDownloadActions(state: Ref<DownloadState>): DownloadActions {
+	return {
+		reset: () => {
+			state.value = { ...initialDownloadState };
+		},
+		setLoading: () => {
+			state.value = {
+				...initialDownloadState,
+				isLoading: true,
+				status: "loading",
+			};
+		},
+		setSuccess: (value: DownloadFileResult) => {
+			state.value = {
+				isLoading: false,
+				error: null,
+				data: value,
+				status: "success",
+			};
+		},
+		setFailure: (value: StorageError) => {
+			state.value = {
+				isLoading: false,
+				error: value,
+				data: null,
+				status: "error",
+			};
+		},
+	};
 }
 
 async function executeDownload<M extends StandardSchemaV1>(
@@ -100,7 +106,6 @@ async function executeDownload<M extends StandardSchemaV1>(
 ): Promise<DownloadFileResult | undefined> {
 	const { client, key, downloadOptions, actions, callbacks } = input;
 	try {
-		actions.reset();
 		actions.setLoading();
 		const result = await client.downloadFile(key, downloadOptions);
 		actions.setSuccess(result);
@@ -120,50 +125,35 @@ async function executeDownload<M extends StandardSchemaV1>(
 	}
 }
 
-function useDownloadHandler<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
-	callbacks: DownloadCallbacks,
-	actions: DownloadStateActions,
-): (
-	key: string,
-	downloadOptions?: DownloadOptions,
-) => Promise<DownloadFileResult | undefined> {
-	return useCallback(
-		async (
-			key: string,
-			downloadOptions?: DownloadOptions,
-		): Promise<DownloadFileResult | undefined> => {
-			return executeDownload({
-				client,
-				key,
-				downloadOptions,
-				actions,
-				callbacks,
-			});
-		},
-		[client, actions, callbacks],
-	);
-}
-
 function useDownloadInternal<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 	options?: UseDownloadOptions,
 ): UseDownloadReturn {
-	const { onSuccess, onError, throwOnError } = options ?? {};
-	const { state, actions } = useDownloadState();
-
+	const state = ref<DownloadState>({ ...initialDownloadState });
+	const actions = createDownloadActions(state);
 	const shouldThrow = resolveThrowOnError(
-		throwOnError,
+		options?.throwOnError,
 		client["~options"].throwOnError,
 	);
 
-	const download = useDownloadHandler(
-		client,
-		{ onSuccess, onError, throwOnError: shouldThrow },
-		actions,
-	);
+	const download = async (
+		key: string,
+		downloadOptions?: DownloadOptions,
+	): Promise<DownloadFileResult | undefined> => {
+		return executeDownload({
+			client,
+			key,
+			downloadOptions,
+			actions,
+			callbacks: {
+				onSuccess: options?.onSuccess,
+				onError: options?.onError,
+				throwOnError: shouldThrow,
+			},
+		});
+	};
 
-	return { state, download, reset: actions.reset };
+	return { state: readonly(state), download, reset: actions.reset };
 }
 
 export function createUseDownload<M extends StandardSchemaV1>(

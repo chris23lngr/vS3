@@ -1,9 +1,9 @@
-import { useCallback, useState } from "react";
+import { type Ref, readonly, ref } from "vue";
 import type { StorageError } from "../../../core/error/error";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import type { BaseStorageClient, UploadFileResult } from "../../create-client";
 import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
-import { normalizeStorageError } from "./storage-error";
+import { normalizeStorageError } from "../../shared/storage-error";
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
 
@@ -15,14 +15,6 @@ type UploadState = {
 	status: UploadStatus;
 };
 
-type UploadStateActions = {
-	reset: () => void;
-	setLoading: () => void;
-	setProgress: (value: number) => void;
-	setSuccess: (value: UploadFileResult) => void;
-	setFailure: (value: StorageError) => void;
-};
-
 type UploadCallbacks = {
 	onProgress?: (progress: number) => void;
 	onSuccess?: (result: UploadFileResult) => void;
@@ -30,11 +22,19 @@ type UploadCallbacks = {
 	throwOnError: boolean;
 };
 
+type UploadActions = {
+	reset: () => void;
+	setLoading: () => void;
+	setProgress: (value: number) => void;
+	setSuccess: (value: UploadFileResult) => void;
+	setFailure: (value: StorageError) => void;
+};
+
 type UploadExecution<M extends StandardSchemaV1> = {
 	client: BaseStorageClient<M>;
 	file: File;
 	metadata: StandardSchemaV1.InferInput<M>;
-	actions: UploadStateActions;
+	actions: UploadActions;
 	callbacks: UploadCallbacks;
 };
 
@@ -46,7 +46,7 @@ export interface UseUploadOptions {
 }
 
 type UseUploadReturn<M extends StandardSchemaV1> = {
-	state: UploadState;
+	state: Readonly<Ref<UploadState>>;
 	upload: (
 		file: File,
 		metadata: StandardSchemaV1.InferInput<M>,
@@ -66,32 +66,35 @@ const initialUploadState: UploadState = {
 	status: "idle",
 };
 
-function useUploadState(): { state: UploadState; actions: UploadStateActions } {
-	const [state, setState] = useState<UploadState>(initialUploadState);
-
-	const reset = useCallback((): void => {
-		setState(initialUploadState);
-	}, []);
-
-	const setLoading = useCallback((): void => {
-		setState((current) => ({ ...current, status: "loading" }));
-	}, []);
-
-	const setProgress = useCallback((value: number): void => {
-		setState((current) => ({ ...current, progress: value }));
-	}, []);
-
-	const setSuccess = useCallback((value: UploadFileResult): void => {
-		setState((current) => ({ ...current, data: value, status: "success" }));
-	}, []);
-
-	const setFailure = useCallback((value: StorageError): void => {
-		setState((current) => ({ ...current, error: value, status: "error" }));
-	}, []);
-
+function createUploadActions(state: Ref<UploadState>): UploadActions {
 	return {
-		state,
-		actions: { reset, setLoading, setProgress, setSuccess, setFailure },
+		reset: () => {
+			state.value = { ...initialUploadState };
+		},
+		setLoading: () => {
+			state.value = { ...initialUploadState, isLoading: true, status: "loading" };
+		},
+		setProgress: (value: number) => {
+			state.value = { ...state.value, progress: value };
+		},
+		setSuccess: (value: UploadFileResult) => {
+			state.value = {
+				...state.value,
+				isLoading: false,
+				data: value,
+				error: null,
+				status: "success",
+			};
+		},
+		setFailure: (value: StorageError) => {
+			state.value = {
+				...state.value,
+				isLoading: false,
+				error: value,
+				data: null,
+				status: "error",
+			};
+		},
 	};
 }
 
@@ -100,7 +103,6 @@ async function executeUpload<M extends StandardSchemaV1>(
 ): Promise<void> {
 	const { client, file, metadata, actions, callbacks } = input;
 	try {
-		actions.reset();
 		actions.setLoading();
 		const result = await client.uploadFile(file, metadata, {
 			onProgress: (value) => {
@@ -123,47 +125,36 @@ async function executeUpload<M extends StandardSchemaV1>(
 	}
 }
 
-function useUploadHandler<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
-	callbacks: UploadCallbacks,
-	actions: UploadStateActions,
-): (file: File, metadata: StandardSchemaV1.InferInput<M>) => Promise<void> {
-	return useCallback(
-		async (
-			file: File,
-			metadata: StandardSchemaV1.InferInput<M>,
-		): Promise<void> => {
-			await executeUpload({
-				client,
-				file,
-				metadata,
-				actions,
-				callbacks,
-			});
-		},
-		[client, actions, callbacks],
-	);
-}
-
 function useUploadInternal<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 	options?: UseUploadOptions,
 ): UseUploadReturn<M> {
-	const { onProgress, onSuccess, onError, throwOnError } = options ?? {};
-	const { state, actions } = useUploadState();
-
+	const state = ref<UploadState>({ ...initialUploadState });
+	const actions = createUploadActions(state);
 	const shouldThrow = resolveThrowOnError(
-		throwOnError,
+		options?.throwOnError,
 		client["~options"].throwOnError,
 	);
 
-	const upload = useUploadHandler(
-		client,
-		{ onProgress, onSuccess, onError, throwOnError: shouldThrow },
-		actions,
-	);
+	const upload = async (
+		file: File,
+		metadata: StandardSchemaV1.InferInput<M>,
+	): Promise<void> => {
+		await executeUpload({
+			client,
+			file,
+			metadata,
+			actions,
+			callbacks: {
+				onProgress: options?.onProgress,
+				onSuccess: options?.onSuccess,
+				onError: options?.onError,
+				throwOnError: shouldThrow,
+			},
+		});
+	};
 
-	return { state, upload, reset: actions.reset };
+	return { state: readonly(state), upload, reset: actions.reset };
 }
 
 export function createUseUpload<M extends StandardSchemaV1>(

@@ -1,0 +1,19 @@
+---
+title: Nuxt
+description: Integrate vS3 with Nuxt 3
+---
+
+`vS3` does not currently provide a dedicated Nuxt integration helper.
+You can integrate it in Nuxt 3 by mounting `storage.handler` through `h3`'s `fromWebHandler`.
+
+## Usage
+
+```ts title="server/api/storage/[...all].ts"
+import { fromWebHandler } from "h3";
+import { storage } from "../../storage";
+
+export default fromWebHandler(storage.handler);
+```
+
+This mounts the vS3 API at `/api/storage/**` in your Nuxt app.
+If you use a custom `apiPath`, mount the route at the matching server path.

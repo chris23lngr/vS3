@@ -91,7 +91,11 @@ While this will work without any other options you might want to pass in some ad
 
 Mount the handlers to your framework of choice at `/api/storage/[...all]`. If you prefer to use a different path, you can pass the `apiPath` option when creating the storage instance. See the [Configuration](/docs/configuration) section for more information.
 
-<CodeTabs groupId="framework" defaultValue="nextjs" values={["nextjs"]}>
+<CodeTabs
+	groupId="framework"
+	defaultValue="nextjs"
+	values={["nextjs", "nuxt"]}
+>
 
 <CodeTabsContent value="nextjs">
 ```ts title="app/api/storage/[...all]/route.ts"
@@ -99,10 +103,19 @@ export const { GET, POST, OPTIONS, PUT } = toNextJsRouteHandler({ handler: stora
 ```
 </CodeTabsContent>
 
+<CodeTabsContent value="nuxt">
+```ts title="server/api/storage/[...all].ts"
+import { fromWebHandler } from "h3";
+import { storage } from "../../storage";
+
+export default fromWebHandler(storage.handler);
+```
+</CodeTabsContent>
+
 </CodeTabs>
 
 <Callout type="info">
-Although we currently only provide an integration for Next.js, `vS3` supports any backend framework that uses standard request and response objects.
+`vS3` provides a built-in helper for Next.js. Nuxt works through Nitro/H3's `fromWebHandler` bridge because `storage.handler` is a standard Web Request handler.
 </Callout>
 
 </Step>
@@ -113,13 +126,28 @@ Although we currently only provide an integration for Next.js, `vS3` supports an
 
 To access the storage API from the client you need to create a client instance. Create a client instance by importing `createStorageClient` for the framework of your choice and passing in the same options you passed to the storage instance.
 
-<CodeTabs groupId="frontend-framework" defaultValue="react" values={["react"]}>
+<CodeTabs
+	groupId="frontend-framework"
+	defaultValue="react"
+	values={["react", "vue"]}
+>
 
 <CodeTabsContent value="react">
 ```ts title="server/storage/client.ts"
 "use client";
 
 import { createStorageClient } from "vs3/react";
+import type { StorageMetadata } from "./server";
+
+export const storageClient = createStorageClient<StorageMetadata>({
+    // Optional configuration
+});
+```
+</CodeTabsContent>
+
+<CodeTabsContent value="vue">
+```ts title="server/storage/client.ts"
+import { createStorageClient } from "vs3/vue";
 import type { StorageMetadata } from "./server";
 
 export const storageClient = createStorageClient<StorageMetadata>({
@@ -145,12 +173,22 @@ This will likely change in the future to allow for more flexibility. See [this i
 
 That's it! You can now use `vS3` to upload and download files. Check out the [usage](/docs/usage) section for more information on how to use the client and server APIs.
 
+<CodeTabs defaultValue="react" values={["react", "vue"]}>
+<CodeTabsContent value="react">
 ```ts title="client-demo.tsx"
 "use client";
 
 const { upload } = storageClient.useUpload();
 upload(file, { userId: "123" });
 ```
+</CodeTabsContent>
+<CodeTabsContent value="vue">
+```ts title="client-demo.ts"
+const { upload } = storageClient.useUpload();
+await upload(file, { userId: "123" });
+```
+</CodeTabsContent>
+</CodeTabs>
 
 </Step>
 
