@@ -22,6 +22,12 @@ export const docs = defineDocs({
 
 export default defineConfig({
 	mdxOptions: {
-		// MDX options
+		rehypeCodeOptions: {
+			theme: "light",
+			themes: {
+				light: "houston",
+				dark: "houston",
+			},
+		},
 	},
 });
