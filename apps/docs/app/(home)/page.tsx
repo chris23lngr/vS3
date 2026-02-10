@@ -1,79 +1,211 @@
-import { ArrowRightIcon, PackageIcon } from "lucide-react";
+import {
+	BadgeCheckIcon,
+	CircleIcon,
+	KeyIcon,
+	LockIcon,
+	PackageIcon,
+	ShieldCheckIcon,
+	StarIcon,
+} from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import AsciiBucket from "@/components/ascii-bucket";
-import { Button } from "@/components/ui/button";
+import { SiteNav } from "@/components/site-nav";
+import {
+	PageDescription,
+	PageTitle,
+	SectionDescription,
+	SectionTitle,
+} from "@/components/typography";
+import { Badge } from "@/components/ui/badge";
+import { SiteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
+import CornerLeftLight from "../../public/corner-left-light.svg";
+import FooterTrapeze from "../../public/footer-trapeze.svg";
 
 export default function HomePage() {
 	return (
-		<main>
-			<section className="relative min-h-svh overflow-hidden py-20" id="hero">
-				<div className="mx-auto w-full max-w-7xl px-8">
-					<div className="mb-8 grid grid-cols-2 gap-4">
-						<div className="hidden md:block">
-							<span className="flex items-center gap-2">
-								<PackageIcon className="size-4 text-blue-600" />
-								<span className="font-mono text-sm">npm install vs3</span>
-							</span>
-						</div>
-						<div>
-							<Link
-								className="block font-mono text-sm underline underline-offset-4"
-								href="/docs"
-							>
-								Documentation
-							</Link>
-						</div>
-						<div className="md:col-start-2">
-							<Link
-								className="block font-mono text-sm underline underline-offset-4"
-								href="https://github.com/chris23lngr/vs3"
-							>
-								GitHub
-							</Link>
-						</div>
-					</div>
-					<h1 className="max-w-3xl font-semibold text-3xl leading-[1.3] md:text-4xl">
-						Typesafe S3 Uploads Without the Glue Code. Built for the Web.
-					</h1>
-					<p className="mt-6 max-w-xl text-base text-muted-foreground">
-						Presigned URLs, validation, metadata schemas, and Framework integrations –
-						everything you need to ship secure S3 access fast.
-					</p>
-					<div className="mt-12 flex flex-col items-center justify-start gap-2 sm:flex-row">
-						<Button
-							className={"w-full px-4 sm:w-auto"}
-							nativeButton={false}
-							render={<Link href="/docs/installation">Get Started</Link>}
-							size={"lg"}
-						/>
+		<main className="">
+			<SiteNav items={SiteConfig.nav.items} />
 
-						<Button
-							className={"w-full px-4 sm:w-auto"}
-							nativeButton={false}
-							render={
-								<Link href="/docs">
-									View Documentation <ArrowRightIcon />
-								</Link>
-							}
-							size={"lg"}
-							variant={"ghost"}
-						/>
-					</div>
+			<section className="relative min-h-[80svh] overflow-hidden pt-0 pb-20">
+				<div className="absolute -right-32 -bottom-32 -z-20">
+					<AsciiBucket className="text-[4px] text-zinc-400 leading-none" />
 				</div>
-				{/* <div className="absolute bottom-0 left-0 -z-20 size-[200%] -translate-x-1/2 translate-y-1/2 bg-radial from-blue-500 to-blue-500/0 opacity-20" /> */}
-				<div
-					className={cn(
-						"absolute -z-10 w-fit **:leading-none",
-						// sm
-						"-right-64 -bottom-1/3 text-[4px]",
-						"sm:-right-80 sm:text-[5px]",
-						"lg:-right-96 lg:-bottom-72 lg:text-[6px]",
-					)}
-				>
-					<AsciiBucket />
+				<div className="border-zinc-200 border-t border-dashed">
+					<div className="mx-auto w-full max-w-7xl border-zinc-200 border-l border-dashed">
+						<div className="w-fit border-zinc-200 border-r border-b border-dashed bg-background p-8">
+							<Badge>
+								<CircleIcon className="fill-violet-500 text-violet-500" />
+								First beta release just went live
+							</Badge>
+							<PageTitle className="mt-6">
+								Stop rebuilding S3 access in every app - we got you covered
+							</PageTitle>
+						</div>
+						<div className="w-fit border-zinc-200 border-r border-b border-dashed bg-background p-8">
+							<PageDescription>
+								A complete, opinionated toolkit for S3 storage access including
+								authentication, security, and extensibility. Build your own S3 storage
+								solution in minutes, not days.
+							</PageDescription>
+						</div>
+						<div className="flex w-fit items-center justify-start gap-4 border-zinc-200 border-r border-b border-dashed bg-background p-8">
+							<button
+								className={cn(
+									"inset-shadow-2xs inset-shadow-white/20 flex h-7 cursor-pointer items-center justify-center rounded-sm bg-linear-to-b from-violet-500 to-violet-600 px-3 py-1 font-medium text-sm text-white shadow-xs ring-1 ring-violet-600 transition-opacity hover:opacity-90",
+									"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+								)}
+								type="button"
+							>
+								<span>Get Started</span>
+							</button>
+							{/* <p className="text-sm text-zinc-500">or</p> */}
+							<button
+								className="inset-shadow-zinc-100 flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-sm bg-background px-3 py-1 font-medium text-sm text-zinc-700 shadow-sm ring-1 ring-zinc-700/10 transition-all hover:opacity-90"
+								type="button"
+							>
+								<StarIcon className="size-3.5 fill-current" />
+								<span>Star on GitHub</span>
+							</button>
+						</div>
+					</div>
 				</div>
 			</section>
+
+			<section
+				className="relative border-zinc-200 border-y bg-zinc-50 py-20 dark:bg-zinc-900"
+				id="features"
+			>
+				<Image
+					alt="Frame 2"
+					className="absolute top-0 left-0 z-20 -translate-y-full"
+					src={CornerLeftLight}
+				/>
+
+				<div className="mx-auto w-full max-w-7xl px-8">
+					<p className="flex items-center justify-start gap-1.5 font-medium text-sm text-violet-600">
+						<LockIcon className="size-3.5" />
+						Security
+					</p>
+					<SectionTitle className="mt-5">
+						Secure by Design - extendable to your needs
+					</SectionTitle>
+					<SectionDescription className="mt-4">
+						Presigned URLs, validation, metadata schemas, and Framework integrations –
+						everything you need to ship secure S3 access fast.
+					</SectionDescription>
+				</div>
+				<div className="mt-12 border-zinc-200 border-y border-dashed dark:border-zinc-700">
+					<div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-8 px-8 sm:grid-cols-2 lg:grid-cols-3">
+						<div className="col-span-1 flex flex-col border-zinc-200 border-x border-b border-dashed bg-white px-6 py-8 sm:col-span-2 lg:col-span-1 lg:border-b-0 dark:border-zinc-700 dark:bg-zinc-950">
+							<div className="relative mb-8 before:absolute before:top-0 before:-left-6.25 before:h-full before:w-0.5 before:bg-violet-600 before:content-['']">
+								<ShieldCheckIcon className="size-5 text-violet-600" />
+							</div>
+							<p className="font-semibold text-sm text-zinc-800 dark:text-zinc-50">
+								Authentication
+							</p>
+							<p className="mt-1 max-w-prose text-sm/relaxed text-zinc-500">
+								Protect your storage API with authentication using any auth provider of
+								your choice. Integrates seamlessly with better-auth, clerk, and more.
+							</p>
+						</div>
+						<div className="flex flex-col border-zinc-200 border-x border-t border-b border-dashed bg-white px-6 py-8 sm:border-b-0 lg:border-t-0 dark:border-zinc-700 dark:bg-zinc-900">
+							<div className="relative mb-8 before:absolute before:top-0 before:-left-6.25 before:h-full before:w-0.5 before:bg-violet-600 before:content-['']">
+								<KeyIcon className="size-5 text-violet-600" />
+							</div>
+							<p className="font-semibold text-sm text-zinc-800 dark:text-zinc-50">
+								Encryption
+							</p>
+							<p className="mt-1 max-w-prose text-sm/relaxed text-zinc-500">
+								Add server-side encryption to your storage objects with{" "}
+								<span className="rounded-sm border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800">
+									SSE-S3
+								</span>
+								,{" "}
+								<span className="rounded-sm border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800">
+									SSE-KMS
+								</span>
+								, or{" "}
+								<span className="rounded-sm border border-zinc-200 bg-zinc-100 px-1 py-0.5 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-800">
+									SSE-C
+								</span>
+								.
+							</p>
+						</div>
+						<div className="flex flex-col border-zinc-200 border-x border-t border-dashed bg-white px-6 py-8 lg:border-t-0 dark:border-zinc-700 dark:bg-zinc-900">
+							<div className="relative mb-8 before:absolute before:top-0 before:-left-6.25 before:h-full before:w-0.5 before:bg-violet-600 before:content-['']">
+								<BadgeCheckIcon className="size-5 text-violet-600" />
+							</div>
+							<p className="font-semibold text-sm text-zinc-800 dark:text-zinc-50">
+								Validation
+							</p>
+							<p className="mt-1 max-w-prose text-sm/relaxed text-zinc-500">
+								Add validation to your storage objects with magic byte detection and
+								file type and size checking or your own custom validators.
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+			<section className="py-32 dark:bg-zinc-900" id="features">
+				<div className="mx-auto w-full max-w-7xl px-8">
+					<p className="flex items-center justify-start gap-1.5 font-medium text-sm text-violet-600">
+						<PackageIcon className="size-3.5" />
+						Framework Agnostic
+					</p>
+					<h2 className="mt-5 max-w-3xl font-medium text-4xl">
+						Works with the framework of your choice
+					</h2>
+				</div>
+				<div className="mx-auto mt-12 border-zinc-200 border-y border-dashed px-8">
+					<div className="mx-auto grid max-w-304 grid-cols-3 gap-8 border-zinc-200 border-x border-dashed">
+						<div className="col-span-2 rounded-lg bg-white p-8 shadow-sm ring-1 ring-zinc-200"></div>
+						<div className="row-span-2 rounded-lg bg-white p-8 shadow-sm ring-1 ring-zinc-200"></div>
+						<div className="rounded-lg bg-white p-8 shadow-sm ring-1 ring-zinc-200"></div>
+						<div className="rounded-lg bg-white p-8 shadow-sm ring-1 ring-zinc-200"></div>
+					</div>
+				</div>
+			</section>
+			<div className="flex translate-y-px items-center justify-center">
+				<Image alt="Footer Trapeze" src={FooterTrapeze} />
+			</div>
+			<footer className="border-zinc-200 border-t bg-zinc-50">
+				<div className="mx-auto w-full max-w-7xl px-8 py-8">
+					<div className="flex items-center justify-center gap-4">
+						<Link
+							className="font-medium text-sm text-zinc-700 hover:text-violet-600"
+							href={SiteConfig.paths.home}
+						>
+							Home
+						</Link>
+						<span className="text-zinc-500">·</span>
+						<Link
+							className="font-medium text-sm text-zinc-700 hover:text-violet-600"
+							href={SiteConfig.paths.docs}
+						>
+							Documentation
+						</Link>
+						<span className="text-zinc-500">·</span>
+						<Link
+							className="font-medium text-sm text-zinc-700 hover:text-violet-600"
+							href={SiteConfig.paths.changelog}
+						>
+							Changelog
+						</Link>
+						<span className="text-zinc-500">·</span>
+						<Link
+							className="font-medium text-sm text-zinc-700 hover:text-violet-600"
+							href={SiteConfig.repository.url}
+						>
+							GitHub
+						</Link>
+					</div>
+					<p className="mt-4 text-center text-xs text-zinc-500">
+						&copy; {new Date().getFullYear()} {SiteConfig.owner}. All rights reserved.
+					</p>
+				</div>
+			</footer>
 		</main>
 	);
 }
