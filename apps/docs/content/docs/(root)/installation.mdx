@@ -75,10 +75,6 @@ export const storage = createStorage({
     bucket: process.env.AWS_BUCKET!,
     adapter,
 });
-
-// Required for the client to infer the metadata schema
-// [!code highlight]
-export type StorageMetadata = storage.$Infer.metadata;
 ```
 
 While this will work without any other options you might want to pass in some additional options. Check out the [Configuration](/docs/configuration) section for more information.
@@ -137,9 +133,9 @@ To access the storage API from the client you need to create a client instance. 
 "use client";
 
 import { createStorageClient } from "vs3/react";
-import type { StorageMetadata } from "./server";
+import type { storage } from "./server";
 
-export const storageClient = createStorageClient<StorageMetadata>({
+export const storageClient = createStorageClient<typeof storage.$Infer>({
     // Optional configuration
 });
 ```
@@ -148,9 +144,9 @@ export const storageClient = createStorageClient<StorageMetadata>({
 <CodeTabsContent value="vue">
 ```ts title="server/storage/client.ts"
 import { createStorageClient } from "vs3/vue";
-import type { StorageMetadata } from "./server";
+import type { storage } from "./server";
 
-export const storageClient = createStorageClient<StorageMetadata>({
+export const storageClient = createStorageClient<typeof storage.$Infer>({
     // Optional configuration
 });
 ```
@@ -158,11 +154,8 @@ export const storageClient = createStorageClient<StorageMetadata>({
 
 </CodeTabs>
 
-If you passed the `StorageMetadata` type to the client instance, you do not need to pass the metadata schema again. The schema will be inferred automatically.
-
-<Callout type="warn">
-This will likely change in the future to allow for more flexibility. See [this issue](https://github.com/chris23lngr/vS3/issues/49) for more information.
-</Callout>
+Pass `typeof storage.$Infer` to share all server-inferred types with the client from a single generic.
+Use a type-only import (`import type`) so no server code is pulled into the client bundle.
 
 
 </Step>

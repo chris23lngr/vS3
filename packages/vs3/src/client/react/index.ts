@@ -1,16 +1,16 @@
-import type { StandardSchemaV1 } from "../../types/standard-schema";
+import type { InferredTypes } from "../../types/infer";
 import { createBaseClient } from "../create-client";
 import type { StorageClientOptions } from "../types";
 import { createUseDownload } from "./hooks/use-download";
 import { createUseUpload } from "./hooks/use-upload";
 
-export function createStorageClient<
-	M extends StandardSchemaV1 = StandardSchemaV1,
->(options?: StorageClientOptions<M>) {
+export function createStorageClient<T extends InferredTypes = InferredTypes>(
+	options?: StorageClientOptions<T>,
+) {
 	const client = createBaseClient(options ?? {});
 
 	return {
-		useUpload: createUseUpload<M>(client),
-		useDownload: createUseDownload<M>(client),
+		useUpload: createUseUpload<T>(client),
+		useDownload: createUseDownload<T>(client),
 	};
 }

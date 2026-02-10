@@ -67,6 +67,7 @@ export type {
 	AuthSession,
 } from "./types/auth";
 export type { S3Encryption } from "./types/encryption";
+export type { InferredTypes } from "./types/infer";
 export type { StorageOptions } from "./types/options";
 export type {
 	NonceStore,

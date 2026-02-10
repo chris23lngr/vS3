@@ -1,6 +1,7 @@
 import { getEndpoints, router } from "../api/router";
 import { createContext } from "../context/create-context";
 import { validateStorageOptions } from "../core/utils/validate-options";
+import type { InferredTypes } from "../types/infer";
 import type { StorageOptions } from "../types/options";
 import type { StandardSchemaV1 } from "../types/standard-schema";
 
@@ -22,6 +23,11 @@ export function createStorage<O extends StorageOptions>(options: O) {
 				StandardSchemaV1.InferInput<NonNullable<O["metadataSchema"]>>,
 				StandardSchemaV1.InferOutput<NonNullable<O["metadataSchema"]>>
 			>,
-		},
+		} as InferredTypes<
+			StandardSchemaV1<
+				StandardSchemaV1.InferInput<NonNullable<O["metadataSchema"]>>,
+				StandardSchemaV1.InferOutput<NonNullable<O["metadataSchema"]>>
+			>
+		>,
 	};
 }

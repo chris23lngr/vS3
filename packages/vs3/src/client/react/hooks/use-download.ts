@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import type { StorageError } from "../../../core/error/error";
 import type { S3Encryption } from "../../../types/encryption";
-import type { StandardSchemaV1 } from "../../../types/standard-schema";
+import type { InferredTypes } from "../../../types/infer";
 import type {
 	BaseStorageClient,
 	DownloadFileResult,
@@ -32,8 +32,8 @@ type DownloadCallbacks = {
 	throwOnError: boolean;
 };
 
-type DownloadExecution<M extends StandardSchemaV1> = {
-	client: BaseStorageClient<M>;
+type DownloadExecution<T extends InferredTypes> = {
+	client: BaseStorageClient<T>;
 	key: string;
 	downloadOptions?: DownloadOptions;
 	actions: DownloadStateActions;
@@ -95,8 +95,8 @@ function useDownloadState(): {
 	return { state, actions: { reset, setLoading, setSuccess, setFailure } };
 }
 
-async function executeDownload<M extends StandardSchemaV1>(
-	input: DownloadExecution<M>,
+async function executeDownload<T extends InferredTypes>(
+	input: DownloadExecution<T>,
 ): Promise<DownloadFileResult | undefined> {
 	const { client, key, downloadOptions, actions, callbacks } = input;
 	try {
@@ -120,8 +120,8 @@ async function executeDownload<M extends StandardSchemaV1>(
 	}
 }
 
-function useDownloadHandler<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
+function useDownloadHandler<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
 	callbacks: DownloadCallbacks,
 	actions: DownloadStateActions,
 ): (
@@ -145,8 +145,8 @@ function useDownloadHandler<M extends StandardSchemaV1>(
 	);
 }
 
-function useDownloadInternal<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
+function useDownloadInternal<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
 	options?: UseDownloadOptions,
 ): UseDownloadReturn {
 	const { onSuccess, onError, throwOnError } = options ?? {};
@@ -166,8 +166,8 @@ function useDownloadInternal<M extends StandardSchemaV1>(
 	return { state, download, reset: actions.reset };
 }
 
-export function createUseDownload<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
+export function createUseDownload<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
 ): UseDownloadHook {
 	return function useDownload(options?: UseDownloadOptions): UseDownloadReturn {
 		return useDownloadInternal(client, options);

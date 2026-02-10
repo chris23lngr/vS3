@@ -59,11 +59,14 @@ export const { GET, POST, PUT, DELETE } = toNextJsRouteHandler({
 
 ```typescript
 import { createStorageClient } from "vs3/react";
+import type { storage } from "./storage";
 
-const client = createStorageClient({
+const client = createStorageClient<typeof storage.$Infer>({
   baseURL: "http://localhost:3000",
   apiPath: "/api/storage",
 });
+
+// Keep the import type-only to avoid pulling server code into client bundles.
 
 function UploadForm() {
   const { upload, progress, isUploading } = client.useUpload();
@@ -79,8 +82,9 @@ function UploadForm() {
 
 ```typescript
 import { createBaseClient } from "vs3";
+import type { storage } from "./storage";
 
-const client = createBaseClient({
+const client = createBaseClient<typeof storage.$Infer>({
   baseURL: "http://localhost:3000",
   apiPath: "/api/storage",
 });

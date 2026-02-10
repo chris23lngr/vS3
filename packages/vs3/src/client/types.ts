@@ -1,11 +1,8 @@
-import type { StandardSchemaV1 } from "../types/standard-schema";
+import type { InferredTypes } from "../types/infer";
 
-export type StorageClientOptions<
-	M extends StandardSchemaV1 = StandardSchemaV1,
-> = {
+export type StorageClientOptions<_T extends InferredTypes = InferredTypes> = {
 	baseURL?: string;
 	apiPath?: string;
-	metadataSchema?: M;
 	/**
 	 * Maximum allowed file size in bytes for client-side validation.
 	 * This is an optional pre-flight check that prevents unnecessary network requests.

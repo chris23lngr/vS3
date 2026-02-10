@@ -1,4 +1,5 @@
 import type { StorageAPI } from "./api";
+import type { InferredTypes } from "./infer";
 import type { StorageOptions } from "./options";
 
 export type Storage<O extends StorageOptions> = {
@@ -8,7 +9,5 @@ export type Storage<O extends StorageOptions> = {
 
 	"~options": O;
 
-	$Infer: {
-		readonly metadata: O["metadataSchema"];
-	};
+	$Infer: InferredTypes<NonNullable<O["metadataSchema"]>>;
 };

@@ -3,6 +3,8 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import z from "zod";
 import { createStorageMiddleware } from "../middleware";
 import type { Adapter } from "../types/adapter";
+import type { InferredTypes } from "../types/infer";
+import type { StandardSchemaV1 } from "../types/standard-schema";
 import { createStorage } from "./create-storage";
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
@@ -45,8 +47,19 @@ describe("storage", () => {
 		});
 
 		expect(storage.$Infer).toBeDefined();
-		// @ts-expect-error TODO: Fix this
-		expectTypeOf(storage.$Infer.metadata).toBeAny();
+		expect(storage.$Infer.metadata).toBeDefined();
+
+		expectTypeOf(storage.$Infer).toEqualTypeOf<
+			InferredTypes<StandardSchemaV1<{ userId: string }, { userId: string }>>
+		>();
+
+		expectTypeOf<
+			StandardSchemaV1.InferInput<(typeof storage.$Infer)["metadata"]>
+		>().toEqualTypeOf<{ userId: string }>();
+
+		expectTypeOf<
+			StandardSchemaV1.InferOutput<(typeof storage.$Infer)["metadata"]>
+		>().toEqualTypeOf<{ userId: string }>();
 	});
 
 	it("generates an upload url and passes metadata to generateKey", async () => {

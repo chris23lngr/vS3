@@ -1,8 +1,8 @@
 "use client";
 
 import { createStorageClient } from "vs3/react";
-import type { MetadataSchema } from "./server";
+import type { storage } from "./server";
 
-export const storageClient = createStorageClient<typeof MetadataSchema>({
+export const storageClient = createStorageClient<typeof storage.$Infer>({
 	apiPath: "/api/storage",
 });

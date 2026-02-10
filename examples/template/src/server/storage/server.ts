@@ -41,5 +41,3 @@ export const storage = createStorage({
 	adapter: createAdapter({ client: getS3Client() }),
 	maxFileSize: 1 * 1024 * 1024,
 });
-
-export const MetadataSchema = storage.$Infer.metadata;
