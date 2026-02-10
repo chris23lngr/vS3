@@ -45,8 +45,7 @@ describe("storage", () => {
 		});
 
 		expect(storage.$Infer).toBeDefined();
-		// @ts-expect-error TODO: Fix this
-		expectTypeOf(storage.$Infer.metadata).toBeAny();
+		expect(storage.$Infer.metadata).toBeDefined();
 	});
 
 	it("generates an upload url and passes metadata to generateKey", async () => {

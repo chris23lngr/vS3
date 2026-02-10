@@ -1,7 +1,7 @@
 import { type Ref, readonly, ref } from "vue";
 import type { StorageError } from "../../../core/error/error";
 import type { S3Encryption } from "../../../types/encryption";
-import type { StandardSchemaV1 } from "../../../types/standard-schema";
+import type { InferredTypes } from "../../../types/infer";
 import type {
 	BaseStorageClient,
 	DownloadFileResult,
@@ -38,8 +38,8 @@ type DownloadActions = {
 	setFailure: (value: StorageError) => void;
 };
 
-type DownloadExecution<M extends StandardSchemaV1> = {
-	client: BaseStorageClient<M>;
+type DownloadExecution<T extends InferredTypes> = {
+	client: BaseStorageClient<T>;
 	key: string;
 	downloadOptions?: DownloadOptions;
 	actions: DownloadActions;
@@ -101,8 +101,8 @@ function createDownloadActions(state: Ref<DownloadState>): DownloadActions {
 	};
 }
 
-async function executeDownload<M extends StandardSchemaV1>(
-	input: DownloadExecution<M>,
+async function executeDownload<T extends InferredTypes>(
+	input: DownloadExecution<T>,
 ): Promise<DownloadFileResult | undefined> {
 	const { client, key, downloadOptions, actions, callbacks } = input;
 	try {
@@ -125,8 +125,8 @@ async function executeDownload<M extends StandardSchemaV1>(
 	}
 }
 
-function useDownloadInternal<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
+function useDownloadInternal<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
 	options?: UseDownloadOptions,
 ): UseDownloadReturn {
 	const state = ref<DownloadState>({ ...initialDownloadState });
@@ -156,8 +156,8 @@ function useDownloadInternal<M extends StandardSchemaV1>(
 	return { state: readonly(state), download, reset: actions.reset };
 }
 
-export function createUseDownload<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
+export function createUseDownload<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
 ): UseDownloadHook {
 	return function useDownload(options?: UseDownloadOptions): UseDownloadReturn {
 		return useDownloadInternal(client, options);

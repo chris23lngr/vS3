@@ -18,6 +18,7 @@ import {
 } from "../core/validation/file-validator";
 import type { S3Encryption } from "../types/encryption";
 import type { FileInfo } from "../types/file";
+import type { InferredTypes } from "../types/infer";
 import type { StandardSchemaV1 } from "../types/standard-schema";
 import {
 	extractFileName,
@@ -450,8 +451,8 @@ type ClientFnOptions = {
 };
 
 export function createBaseClient<
-	M extends StandardSchemaV1 = StandardSchemaV1,
-	O extends StorageClientOptions<M> = StorageClientOptions<M>,
+	T extends InferredTypes = InferredTypes,
+	O extends StorageClientOptions<T> = StorageClientOptions<T>,
 >(options: O) {
 	const {
 		baseURL = DEFAULT_BASE_URL,
@@ -491,7 +492,7 @@ export function createBaseClient<
 		 */
 		uploadFile: async (
 			file: File,
-			metadata: StandardSchemaV1.InferInput<NonNullable<O["metadataSchema"]>>,
+			metadata: StandardSchemaV1.InferInput<T["metadata"]>,
 			options?: Partial<
 				ClientFnOptions & {
 					retry?: undefined | true | number;
@@ -510,7 +511,7 @@ export function createBaseClient<
 			});
 
 			try {
-				const result = await executeUploadRequest<NonNullable<O["metadataSchema"]>>(
+				const result = await executeUploadRequest<T["metadata"]>(
 					$fetch,
 					file,
 					fileInfo,
@@ -568,6 +569,6 @@ export function createBaseClient<
 }
 
 export type BaseStorageClient<
-	M extends StandardSchemaV1 = StandardSchemaV1,
-	O extends StorageClientOptions<M> = StorageClientOptions<M>,
-> = ReturnType<typeof createBaseClient<M, O>>;
+	T extends InferredTypes = InferredTypes,
+	O extends StorageClientOptions<T> = StorageClientOptions<T>,
+> = ReturnType<typeof createBaseClient<T, O>>;

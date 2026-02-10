@@ -1,5 +1,6 @@
 import { type Ref, readonly, ref } from "vue";
 import type { StorageError } from "../../../core/error/error";
+import type { InferredTypes } from "../../../types/infer";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import type { BaseStorageClient, UploadFileResult } from "../../create-client";
 import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
@@ -30,10 +31,10 @@ type UploadActions = {
 	setFailure: (value: StorageError) => void;
 };
 
-type UploadExecution<M extends StandardSchemaV1> = {
-	client: BaseStorageClient<M>;
+type UploadExecution<T extends InferredTypes> = {
+	client: BaseStorageClient<T>;
 	file: File;
-	metadata: StandardSchemaV1.InferInput<M>;
+	metadata: StandardSchemaV1.InferInput<T["metadata"]>;
 	actions: UploadActions;
 	callbacks: UploadCallbacks;
 };
@@ -45,18 +46,18 @@ export interface UseUploadOptions {
 	throwOnError?: boolean;
 }
 
-type UseUploadReturn<M extends StandardSchemaV1> = {
+type UseUploadReturn<T extends InferredTypes> = {
 	state: Readonly<Ref<UploadState>>;
 	upload: (
 		file: File,
-		metadata: StandardSchemaV1.InferInput<M>,
+		metadata: StandardSchemaV1.InferInput<T["metadata"]>,
 	) => Promise<void>;
 	reset: () => void;
 };
 
-type UseUploadHook<M extends StandardSchemaV1> = (
+type UseUploadHook<T extends InferredTypes> = (
 	options?: UseUploadOptions,
-) => UseUploadReturn<M>;
+) => UseUploadReturn<T>;
 
 const initialUploadState: UploadState = {
 	isLoading: false,
@@ -98,8 +99,8 @@ function createUploadActions(state: Ref<UploadState>): UploadActions {
 	};
 }
 
-async function executeUpload<M extends StandardSchemaV1>(
-	input: UploadExecution<M>,
+async function executeUpload<T extends InferredTypes>(
+	input: UploadExecution<T>,
 ): Promise<void> {
 	const { client, file, metadata, actions, callbacks } = input;
 	try {
@@ -125,10 +126,10 @@ async function executeUpload<M extends StandardSchemaV1>(
 	}
 }
 
-function useUploadInternal<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
+function useUploadInternal<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
 	options?: UseUploadOptions,
-): UseUploadReturn<M> {
+): UseUploadReturn<T> {
 	const state = ref<UploadState>({ ...initialUploadState });
 	const actions = createUploadActions(state);
 	const shouldThrow = resolveThrowOnError(
@@ -138,7 +139,7 @@ function useUploadInternal<M extends StandardSchemaV1>(
 
 	const upload = async (
 		file: File,
-		metadata: StandardSchemaV1.InferInput<M>,
+		metadata: StandardSchemaV1.InferInput<T["metadata"]>,
 	): Promise<void> => {
 		await executeUpload({
 			client,
@@ -157,10 +158,10 @@ function useUploadInternal<M extends StandardSchemaV1>(
 	return { state: readonly(state), upload, reset: actions.reset };
 }
 
-export function createUseUpload<M extends StandardSchemaV1>(
-	client: BaseStorageClient<M>,
-): UseUploadHook<M> {
-	return function useUpload(options?: UseUploadOptions): UseUploadReturn<M> {
+export function createUseUpload<T extends InferredTypes>(
+	client: BaseStorageClient<T>,
+): UseUploadHook<T> {
+	return function useUpload(options?: UseUploadOptions): UseUploadReturn<T> {
 		return useUploadInternal(client, options);
 	};
 }

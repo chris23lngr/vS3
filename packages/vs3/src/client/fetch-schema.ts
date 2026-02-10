@@ -1,11 +1,11 @@
 import { createSchema } from "@better-fetch/fetch";
 import { routeRegistry } from "../api/registry";
-import type { StandardSchemaV1 } from "../types/standard-schema";
+import type { InferredTypes } from "../types/infer";
 import type { StorageClientOptions } from "./types";
 
 export const createFetchSchema = <
-	M extends StandardSchemaV1,
-	O extends StorageClientOptions<M>,
+	T extends InferredTypes,
+	O extends StorageClientOptions<T>,
 >(
 	_options: O,
 ) => {
