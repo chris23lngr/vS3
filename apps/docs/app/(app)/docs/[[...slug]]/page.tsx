@@ -3,9 +3,8 @@ import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions";
-import { DocsFooter } from "@/components/docs-footer";
 import { PageDescription, PageTitle } from "@/components/typography";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button-v2";
 import { SiteConfig } from "@/lib/config";
 import { source } from "@/lib/source";
 import { components } from "@/mdx-components";
@@ -120,7 +119,7 @@ export default async function Page(props: {
 						<div className="flex items-start justify-start">
 							{neighbours.previous && (
 								<Button
-									className="shadow-none"
+									nativeButton={false}
 									render={
 										<Link href={neighbours.previous.url}>
 											<ArrowLeftIcon /> {neighbours.previous.name}
@@ -133,10 +132,11 @@ export default async function Page(props: {
 						<div className="flex items-start justify-end">
 							{neighbours.next && (
 								<Button
-									className="shadow-none"
+									nativeButton={false}
 									render={
 										<Link href={neighbours.next.url}>
-											<ArrowRightIcon /> {neighbours.next.name}
+											{neighbours.next.name}
+											<ArrowRightIcon />
 										</Link>
 									}
 									variant={"outline"}

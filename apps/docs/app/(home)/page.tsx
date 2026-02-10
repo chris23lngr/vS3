@@ -18,6 +18,7 @@ import {
 	SectionTitle,
 } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button-v2";
 import { SiteConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 import CornerLeftLight from "../../public/corner-left-light.svg";
@@ -29,8 +30,8 @@ export default function HomePage() {
 			<SiteNav items={SiteConfig.nav.items} />
 
 			<section className="relative min-h-[80svh] overflow-hidden pt-0 pb-20">
-				<div className="absolute -right-32 -bottom-32 -z-20">
-					<AsciiBucket className="text-[4px] text-zinc-400 leading-none" />
+				<div className="absolute -right-32 -bottom-32 -z-20 xl:-bottom-42">
+					<AsciiBucket className="text-[4px] text-zinc-400 leading-none xl:text-[5px]" />
 				</div>
 				<div className="border-zinc-200 border-t border-dashed">
 					<div className="mx-auto w-full max-w-7xl border-zinc-200 border-l border-dashed">
@@ -51,23 +52,11 @@ export default function HomePage() {
 							</PageDescription>
 						</div>
 						<div className="flex w-fit items-center justify-start gap-4 border-zinc-200 border-r border-b border-dashed bg-background p-8">
-							<button
-								className={cn(
-									"inset-shadow-2xs inset-shadow-white/20 flex h-7 cursor-pointer items-center justify-center rounded-sm bg-linear-to-b from-violet-500 to-violet-600 px-3 py-1 font-medium text-sm text-white shadow-xs ring-1 ring-violet-600 transition-opacity hover:opacity-90",
-									"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-								)}
-								type="button"
-							>
-								<span>Get Started</span>
-							</button>
-							{/* <p className="text-sm text-zinc-500">or</p> */}
-							<button
-								className="inset-shadow-zinc-100 flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-sm bg-background px-3 py-1 font-medium text-sm text-zinc-700 shadow-sm ring-1 ring-zinc-700/10 transition-all hover:opacity-90"
-								type="button"
-							>
+							<Button variant="default">Get Started</Button>
+							<Button variant="outline">
 								<StarIcon className="size-3.5 fill-current" />
 								<span>Star on GitHub</span>
-							</button>
+							</Button>
 						</div>
 					</div>
 				</div>
