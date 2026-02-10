@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import type { StorageError } from "../../../core/error/error";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import type { BaseStorageClient, UploadFileResult } from "../../create-client";
+import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
 import { normalizeStorageError } from "./storage-error";
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
@@ -38,9 +39,9 @@ type UploadExecution<M extends StandardSchemaV1> = {
 };
 
 export interface UseUploadOptions {
-	onProgress: (progress: number) => void;
-	onSuccess: (result: UploadFileResult) => void;
-	onError: (error: StorageError) => void;
+	onProgress?: (progress: number) => void;
+	onSuccess?: (result: UploadFileResult) => void;
+	onError?: (error: StorageError) => void;
 	throwOnError?: boolean;
 }
 
@@ -148,13 +149,13 @@ function useUploadInternal<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 	options?: UseUploadOptions,
 ): UseUploadReturn<M> {
-	const { onProgress, onSuccess, onError, throwOnError = false } = options ?? {};
+	const { onProgress, onSuccess, onError, throwOnError } = options ?? {};
 	const { state, actions } = useUploadState();
 
-	const shouldThrow =
-		throwOnError !== undefined
-			? throwOnError
-			: client["~options"].throwOnError === true;
+	const shouldThrow = resolveThrowOnError(
+		throwOnError,
+		client["~options"].throwOnError,
+	);
 
 	const upload = useUploadHandler(
 		client,

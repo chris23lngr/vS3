@@ -7,6 +7,7 @@ import type {
 	DownloadFileResult,
 	DownloadMode,
 } from "../../create-client";
+import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
 import { normalizeStorageError } from "../../shared/storage-error";
 
 type DownloadStatus = "idle" | "loading" | "success" | "error";
@@ -17,8 +18,6 @@ type DownloadState = {
 	data: DownloadFileResult | null;
 	status: DownloadStatus;
 };
-
-type DownloadStateRef = Ref<DownloadState>;
 
 type DownloadOptions = Partial<{
 	expiresIn: number;
@@ -48,13 +47,13 @@ type DownloadExecution<M extends StandardSchemaV1> = {
 };
 
 export interface UseDownloadOptions {
-	onSuccess: (result: DownloadFileResult) => void;
-	onError: (error: StorageError) => void;
+	onSuccess?: (result: DownloadFileResult) => void;
+	onError?: (error: StorageError) => void;
 	throwOnError?: boolean;
 }
 
 type UseDownloadReturn = {
-	state: Readonly<DownloadStateRef>;
+	state: Readonly<Ref<DownloadState>>;
 	download: (
 		key: string,
 		downloadOptions?: DownloadOptions,
@@ -62,9 +61,7 @@ type UseDownloadReturn = {
 	reset: () => void;
 };
 
-type UseDownloadHook = (
-	options?: Partial<UseDownloadOptions>,
-) => UseDownloadReturn;
+type UseDownloadHook = (options?: UseDownloadOptions) => UseDownloadReturn;
 
 const initialDownloadState: DownloadState = {
 	isLoading: false,
@@ -73,7 +70,7 @@ const initialDownloadState: DownloadState = {
 	status: "idle",
 };
 
-function createDownloadActions(state: DownloadStateRef): DownloadActions {
+function createDownloadActions(state: Ref<DownloadState>): DownloadActions {
 	return {
 		reset: () => {
 			state.value = { ...initialDownloadState };
@@ -104,23 +101,11 @@ function createDownloadActions(state: DownloadStateRef): DownloadActions {
 	};
 }
 
-function resolveThrowOnError(
-	optionThrowOnError: boolean | undefined,
-	clientThrowOnError: boolean | undefined,
-): boolean {
-	if (optionThrowOnError !== undefined) {
-		return optionThrowOnError;
-	}
-
-	return clientThrowOnError === true;
-}
-
 async function executeDownload<M extends StandardSchemaV1>(
 	input: DownloadExecution<M>,
 ): Promise<DownloadFileResult | undefined> {
 	const { client, key, downloadOptions, actions, callbacks } = input;
 	try {
-		actions.reset();
 		actions.setLoading();
 		const result = await client.downloadFile(key, {
 			...downloadOptions,
@@ -146,7 +131,7 @@ async function executeDownload<M extends StandardSchemaV1>(
 
 function useDownloadInternal<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
-	options?: Partial<UseDownloadOptions>,
+	options?: UseDownloadOptions,
 ): UseDownloadReturn {
 	const state = ref<DownloadState>({ ...initialDownloadState });
 	const actions = createDownloadActions(state);
@@ -178,9 +163,7 @@ function useDownloadInternal<M extends StandardSchemaV1>(
 export function createUseDownload<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 ): UseDownloadHook {
-	return function useDownload(
-		options?: Partial<UseDownloadOptions>,
-	): UseDownloadReturn {
+	return function useDownload(options?: UseDownloadOptions): UseDownloadReturn {
 		return useDownloadInternal(client, options);
 	};
 }

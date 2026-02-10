@@ -7,6 +7,7 @@ import type {
 	DownloadFileResult,
 	DownloadMode,
 } from "../../create-client";
+import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
 import { normalizeStorageError } from "./storage-error";
 
 type DownloadStatus = "idle" | "loading" | "success" | "error";
@@ -46,8 +47,8 @@ type DownloadOptions = Partial<{
 }>;
 
 export interface UseDownloadOptions {
-	onSuccess: (result: DownloadFileResult) => void;
-	onError: (error: StorageError) => void;
+	onSuccess?: (result: DownloadFileResult) => void;
+	onError?: (error: StorageError) => void;
 	throwOnError?: boolean;
 }
 
@@ -60,9 +61,7 @@ type UseDownloadReturn = {
 	reset: () => void;
 };
 
-type UseDownloadHook = (
-	options?: Partial<UseDownloadOptions>,
-) => UseDownloadReturn;
+type UseDownloadHook = (options?: UseDownloadOptions) => UseDownloadReturn;
 
 const initialDownloadState: DownloadState = {
 	isLoading: false,
@@ -152,15 +151,15 @@ function useDownloadHandler<M extends StandardSchemaV1>(
 
 function useDownloadInternal<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
-	options?: Partial<UseDownloadOptions>,
+	options?: UseDownloadOptions,
 ): UseDownloadReturn {
-	const { onSuccess, onError, throwOnError = false } = options ?? {};
+	const { onSuccess, onError, throwOnError } = options ?? {};
 	const { state, actions } = useDownloadState();
 
-	const shouldThrow =
-		throwOnError !== undefined
-			? throwOnError
-			: client["~options"].throwOnError === true;
+	const shouldThrow = resolveThrowOnError(
+		throwOnError,
+		client["~options"].throwOnError,
+	);
 
 	const download = useDownloadHandler(
 		client,
@@ -174,9 +173,7 @@ function useDownloadInternal<M extends StandardSchemaV1>(
 export function createUseDownload<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 ): UseDownloadHook {
-	return function useDownload(
-		options?: Partial<UseDownloadOptions>,
-	): UseDownloadReturn {
+	return function useDownload(options?: UseDownloadOptions): UseDownloadReturn {
 		return useDownloadInternal(client, options);
 	};
 }

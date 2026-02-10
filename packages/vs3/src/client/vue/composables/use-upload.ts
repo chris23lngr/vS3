@@ -2,6 +2,7 @@ import { type Ref, readonly, ref } from "vue";
 import type { StorageError } from "../../../core/error/error";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import type { BaseStorageClient, UploadFileResult } from "../../create-client";
+import { resolveThrowOnError } from "../../shared/resolve-throw-on-error";
 import { normalizeStorageError } from "../../shared/storage-error";
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
@@ -21,8 +22,6 @@ type UploadCallbacks = {
 	throwOnError: boolean;
 };
 
-type UploadStateRef = Ref<UploadState>;
-
 type UploadActions = {
 	reset: () => void;
 	setLoading: () => void;
@@ -40,14 +39,14 @@ type UploadExecution<M extends StandardSchemaV1> = {
 };
 
 export interface UseUploadOptions {
-	onProgress: (progress: number) => void;
-	onSuccess: (result: UploadFileResult) => void;
-	onError: (error: StorageError) => void;
+	onProgress?: (progress: number) => void;
+	onSuccess?: (result: UploadFileResult) => void;
+	onError?: (error: StorageError) => void;
 	throwOnError?: boolean;
 }
 
 type UseUploadReturn<M extends StandardSchemaV1> = {
-	state: Readonly<UploadStateRef>;
+	state: Readonly<Ref<UploadState>>;
 	upload: (
 		file: File,
 		metadata: StandardSchemaV1.InferInput<M>,
@@ -56,7 +55,7 @@ type UseUploadReturn<M extends StandardSchemaV1> = {
 };
 
 type UseUploadHook<M extends StandardSchemaV1> = (
-	options?: Partial<UseUploadOptions>,
+	options?: UseUploadOptions,
 ) => UseUploadReturn<M>;
 
 const initialUploadState: UploadState = {
@@ -67,7 +66,7 @@ const initialUploadState: UploadState = {
 	status: "idle",
 };
 
-function createUploadActions(state: UploadStateRef): UploadActions {
+function createUploadActions(state: Ref<UploadState>): UploadActions {
 	return {
 		reset: () => {
 			state.value = { ...initialUploadState };
@@ -99,23 +98,11 @@ function createUploadActions(state: UploadStateRef): UploadActions {
 	};
 }
 
-function resolveThrowOnError(
-	optionThrowOnError: boolean | undefined,
-	clientThrowOnError: boolean | undefined,
-): boolean {
-	if (optionThrowOnError !== undefined) {
-		return optionThrowOnError;
-	}
-
-	return clientThrowOnError === true;
-}
-
 async function executeUpload<M extends StandardSchemaV1>(
 	input: UploadExecution<M>,
 ): Promise<void> {
 	const { client, file, metadata, actions, callbacks } = input;
 	try {
-		actions.reset();
 		actions.setLoading();
 		const result = await client.uploadFile(file, metadata, {
 			onProgress: (value) => {
@@ -140,7 +127,7 @@ async function executeUpload<M extends StandardSchemaV1>(
 
 function useUploadInternal<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
-	options?: Partial<UseUploadOptions>,
+	options?: UseUploadOptions,
 ): UseUploadReturn<M> {
 	const state = ref<UploadState>({ ...initialUploadState });
 	const actions = createUploadActions(state);
@@ -173,9 +160,7 @@ function useUploadInternal<M extends StandardSchemaV1>(
 export function createUseUpload<M extends StandardSchemaV1>(
 	client: BaseStorageClient<M>,
 ): UseUploadHook<M> {
-	return function useUpload(
-		options?: Partial<UseUploadOptions>,
-	): UseUploadReturn<M> {
+	return function useUpload(options?: UseUploadOptions): UseUploadReturn<M> {
 		return useUploadInternal(client, options);
 	};
 }
