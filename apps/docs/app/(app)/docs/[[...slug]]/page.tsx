@@ -1,0 +1,177 @@
+import { findNeighbour } from "fumadocs-core/page-tree";
+import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { PageDescription, PageTitle } from "@/components/typography";
+import { Button } from "@/components/ui/button";
+import { source } from "@/lib/source";
+import { components } from "@/mdx-components";
+
+export const revalidate = false;
+export const dynamic = "force-static";
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+	return source.generateParams();
+}
+
+export async function generateMetadata(props: {
+	params: Promise<{ slug: string[] }>;
+}) {
+	const params = await props.params;
+	const page = source.getPage(params.slug);
+
+	if (!page) {
+		notFound();
+	}
+
+	const doc = page.data;
+
+	if (!doc.title || !doc.description) {
+		notFound();
+	}
+
+	return {
+		title: doc.title,
+		description: doc.description,
+		openGraph: {
+			title: doc.title,
+			description: doc.description,
+			type: "article",
+			images: [
+				{
+					url: `/og?title=${encodeURIComponent(
+						doc.title,
+					)}&description=${encodeURIComponent(doc.description)}`,
+				},
+			],
+		},
+		twitter: {
+			card: "summary_large_image",
+			title: doc.title,
+			description: doc.description,
+			images: [
+				{
+					url: `/og?title=${encodeURIComponent(
+						doc.title,
+					)}&description=${encodeURIComponent(doc.description)}`,
+				},
+			],
+			creator: "@shadcn",
+		},
+	};
+}
+
+export default async function Page(props: {
+	params: Promise<{ slug: string[] }>;
+}) {
+	const params = await props.params;
+	const page = source.getPage(params.slug);
+	if (!page) {
+		notFound();
+	}
+
+	const doc = page.data;
+	const MDX = doc.body;
+	const isChangelog = params.slug?.[0] === "changelog";
+	const neighbours = isChangelog
+		? { previous: null, next: null }
+		: findNeighbour(source.pageTree, page.url);
+	const _raw = await page.data.getText("raw");
+
+	doc.toc;
+	return (
+		<div
+			className="flex scroll-mt-24 items-stretch pb-8 text-[1.05rem] sm:text-[15px] xl:w-full"
+			data-slot="docs"
+		>
+			<div className="flex min-w-0 flex-1 flex-col">
+				<div className="h-(--top-spacing) shrink-0" />
+				<div className="mx-auto flex w-full min-w-0 max-w-[40rem] flex-1 flex-col gap-6 px-4 py-6 text-neutral-800 md:px-0 lg:py-8 dark:text-neutral-300">
+					<div className="flex flex-col gap-2">
+						<div className="flex flex-col gap-2">
+							<div className="flex items-center justify-between md:items-start">
+								<PageTitle className="scroll-m-24">{doc.title}</PageTitle>
+								<div className="docs-nav flex items-center gap-2">
+									<div className="ml-auto flex gap-2">
+										{neighbours.previous && (
+											<Button
+												className="extend-touch-target size-8 shadow-none md:size-7"
+												render={
+													<Link href={neighbours.previous.url}>
+														<ArrowLeftIcon />
+														<span className="sr-only">Previous</span>
+													</Link>
+												}
+												size="icon"
+												variant="secondary"
+											/>
+										)}
+										{neighbours.next && (
+											<Button
+												className="extend-touch-target size-8 shadow-none md:size-7"
+												render={
+													<Link href={neighbours.next.url}>
+														<ArrowRightIcon />
+														<span className="sr-only">Next</span>
+													</Link>
+												}
+												size="icon"
+												variant="secondary"
+											/>
+										)}
+									</div>
+								</div>
+							</div>
+							{doc.description && <PageDescription>{doc.description}</PageDescription>}
+						</div>
+					</div>
+					<div className="w-full flex-1 pb-16 *:data-[slot=alert]:first:mt-0 sm:pb-0">
+						<MDX components={components} />
+					</div>
+					<div className="mt-8 grid grid-cols-2 gap-4">
+						<div></div>
+						<div></div>
+					</div>
+					<div className="hidden h-16 w-full items-center gap-2 px-4 sm:flex sm:px-0">
+						{neighbours.previous && (
+							<Button
+								className="shadow-none"
+								render={
+									<Link href={neighbours.previous.url}>
+										<ArrowLeftIcon /> {neighbours.previous.name}
+									</Link>
+								}
+								size="sm"
+								variant="secondary"
+							/>
+						)}
+						{neighbours.next && (
+							<Button
+								className="shadow-none"
+								render={
+									<Link href={neighbours.next.url}>
+										<ArrowRightIcon /> {neighbours.next.name}
+									</Link>
+								}
+								size="sm"
+								variant="secondary"
+							/>
+						)}
+					</div>
+				</div>
+			</div>
+			<div className="sticky top-[calc(var(--header-height)+1px)] z-30 ml-auto hidden h-[90svh] w-(--sidebar-width) flex-col gap-4 overflow-hidden overscroll-none pb-8 xl:flex">
+				<div className="h-(--top-spacing) shrink-0"></div>
+				{doc.toc?.length ? (
+					<div className="no-scrollbar flex flex-col gap-8 overflow-y-auto px-8">
+						{/* <DocsTableOfContents toc={doc.toc} /> */}
+					</div>
+				) : null}
+				<div className="hidden flex-1 flex-col gap-6 px-6 xl:flex">
+					{/* <OpenInV0Cta /> */}
+				</div>
+			</div>
+		</div>
+	);
+}

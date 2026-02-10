@@ -1,0 +1,20 @@
+import { DocsSidebar } from "@/components/docs-sidebar";
+import { SiteNav } from "@/components/site-nav";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { SiteConfig } from "@/lib/config";
+import { source } from "@/lib/source";
+
+export default function Layout({ children }: LayoutProps<"/docs">) {
+	return (
+		<SidebarProvider>
+			<DocsSidebar tree={source.getPageTree()} />
+			<main className="relative flex-1">
+				<SiteNav
+					className="sticky top-0 z-20 border-zinc-200 border-b bg-background"
+					items={SiteConfig.nav.items}
+				/>
+				{children}
+			</main>
+		</SidebarProvider>
+	);
+}
