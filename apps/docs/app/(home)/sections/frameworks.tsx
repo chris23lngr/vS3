@@ -77,7 +77,7 @@ export function FrameworksSection() {
 						</div>
 						{Array.from({ length: 5 }).map((_, index) => (
 							// biome-ignore lint/suspicious/noArrayIndexKey: Just a placeholder
-							<div className="bg-zinc-50" key={index} />
+							<div className="bg-zinc-50 dark:bg-zinc-900" key={index} />
 						))}
 					</div>
 				</div>
