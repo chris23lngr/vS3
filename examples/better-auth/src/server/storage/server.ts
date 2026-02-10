@@ -44,5 +44,3 @@ export const storage = createStorage({
 	maxFileSize: 1 * 1024 * 1024,
 	middlewares: [betterAuth({ auth })],
 });
-
-export const MetadataSchema = storage.$Infer.metadata;
