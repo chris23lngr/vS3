@@ -34,8 +34,11 @@ export type RateLimitConfig = {
 	 * Custom function that derives the rate-limit bucket key from the
 	 * request context.
 	 *
-	 * @default Composite key of client IP (`x-forwarded-for` or
-	 * `"unknown"`) and request path.
+	 * Use {@link resolveClientIp} to incorporate the client IP into a
+	 * custom key — but only when the deployment guarantees that a
+	 * trusted reverse proxy overwrites `x-forwarded-for`.
+	 *
+	 * @default `ctx.path` — global per-path bucket.
 	 */
 	readonly keyGenerator?: RateLimitKeyGenerator;
 };
@@ -74,17 +77,6 @@ export function resolveClientIp(headers: Headers): string {
 	return "unknown";
 }
 
-/**
- * Default key generator: combines client IP with the request path.
- *
- * This ensures each client has its own per-path bucket instead of
- * sharing a single global bucket per path.
- */
-function defaultKeyGenerator(ctx: StorageMiddlewareContext): string {
-	const ip = resolveClientIp(ctx.headers);
-	return `${ip}:${ctx.path}`;
-}
-
 /** Creates an in-memory rate limit store using fixed windows. */
 export function createInMemoryRateLimitStore(): RateLimitStore {
 	const windows = new Map<string, { count: number; expiresAt: number }>();
@@ -110,7 +102,7 @@ export function createRateLimitMiddleware(
 	config: RateLimitConfig,
 ): StorageMiddleware<object, RateLimitResult> {
 	validateRateLimitConfig(config);
-	const generateKey = config.keyGenerator ?? defaultKeyGenerator;
+	const generateKey = config.keyGenerator ?? ((ctx) => ctx.path);
 
 	return createStorageMiddleware(
 		{

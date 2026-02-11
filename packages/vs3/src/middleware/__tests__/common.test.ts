@@ -306,16 +306,22 @@ describe("resolveClientIp", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Rate Limit - Per-IP Isolation (default key generator)
+// Rate Limit - Per-IP Isolation (opt-in via keyGenerator)
 // ---------------------------------------------------------------------------
 
 describe("createRateLimitMiddleware per-IP isolation", () => {
+	const ipKeyGenerator: RateLimitKeyGenerator = (ctx) => {
+		const ip = resolveClientIp(ctx.headers);
+		return `${ip}:${ctx.path}`;
+	};
+
 	it("tracks different IPs independently on the same path", async () => {
 		const store = createInMemoryRateLimitStore();
 		const middleware = createRateLimitMiddleware({
 			maxRequests: 1,
 			windowMs: 60_000,
 			store,
+			keyGenerator: ipKeyGenerator,
 		});
 
 		await executeMiddlewareChain(
@@ -341,6 +347,7 @@ describe("createRateLimitMiddleware per-IP isolation", () => {
 			maxRequests: 1,
 			windowMs: 60_000,
 			store,
+			keyGenerator: ipKeyGenerator,
 		});
 
 		await executeMiddlewareChain(
@@ -436,15 +443,12 @@ describe("createRateLimitMiddleware custom keyGenerator", () => {
 		}
 	});
 
-	it("supports path-only key for backwards compatibility", async () => {
+	it("default key uses path-scoped global bucket", async () => {
 		const store = createInMemoryRateLimitStore();
-		const pathOnlyKey: RateLimitKeyGenerator = (ctx) => ctx.path;
-
 		const middleware = createRateLimitMiddleware({
 			maxRequests: 1,
 			windowMs: 60_000,
 			store,
-			keyGenerator: pathOnlyKey,
 		});
 
 		await executeMiddlewareChain(
