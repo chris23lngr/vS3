@@ -1,11 +1,4 @@
 {
 	"root": true,
-	"pages": [
-		"concepts",
-		"server",
-		"client",
-		"middleware",
-		"adapters",
-		"integrations"
-	]
+	"pages": ["concepts", "server", "client", "middleware", "integrations"]
 }
