@@ -121,7 +121,7 @@ describe("createUseMultipartUpload", () => {
 
 	it("sets loading state during upload", async () => {
 		const client = createBaseClient({});
-		let capturedState: string | undefined;
+		let _capturedState: string | undefined;
 		client.multipartUpload = vi.fn(async () => {
 			// Can't capture intermediate state synchronously in Vue composable,
 			// but we can verify the final state transitions

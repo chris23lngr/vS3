@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-	executeMultipartUpload,
-	type MultipartUploadOptions,
-} from "./orchestrator";
+import { executeMultipartUpload } from "./orchestrator";
 
 function createMockFetch() {
 	const responses: Record<string, unknown> = {
