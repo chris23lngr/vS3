@@ -1,6 +1,6 @@
 "use client";
 
-import { BlocksIcon, BookmarkIcon, DownloadIcon } from "lucide-react";
+import { BlocksIcon, DownloadIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
