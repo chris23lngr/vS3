@@ -42,6 +42,7 @@ export type {
 	MiddlewareConfig,
 	MiddlewareHandler,
 	RateLimitConfig,
+	RateLimitKeyGenerator,
 	RateLimitStore,
 	StorageMiddleware,
 	StorageMiddlewareContext,
@@ -61,6 +62,7 @@ export {
 	createTimeoutMiddleware,
 	createVerifySignatureMiddleware,
 	executeMiddlewareChain,
+	resolveClientIp,
 } from "./middleware";
 export { createStorage } from "./storage/create-storage";
 export type { Adapter } from "./types/adapter";

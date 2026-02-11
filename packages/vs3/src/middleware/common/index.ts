@@ -9,6 +9,8 @@ export {
 	createInMemoryRateLimitStore,
 	createRateLimitMiddleware,
 	type RateLimitConfig,
+	type RateLimitKeyGenerator,
 	type RateLimitStore,
+	resolveClientIp,
 } from "./rate-limit";
 export { createTimeoutMiddleware, type TimeoutConfig } from "./timeout";
