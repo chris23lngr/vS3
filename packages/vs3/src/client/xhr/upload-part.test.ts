@@ -449,4 +449,69 @@ describe("xhrUploadPart", () => {
 		vi.doUnmock("./xhr-factory");
 		vi.resetModules();
 	});
+
+	it("aborts during retry backoff without waiting for next attempt", async () => {
+		let attemptCount = 0;
+		vi.resetModules();
+
+		vi.doMock("../../core/resilience/retry", async () => {
+			const actual = await vi.importActual<
+				typeof import("../../core/resilience/retry")
+			>("../../core/resilience/retry");
+			return {
+				...actual,
+				sleep: vi.fn(() => new Promise<void>(() => {})),
+			};
+		});
+
+		vi.doMock("./xhr-factory", () => ({
+			XhrFactory: class MockXhrFactory {
+				private errorHandler:
+					| ((status: number, statusText: string, cleanup: () => void) => void)
+					| undefined;
+
+				open() {}
+				appendHeaders() {}
+				appendRawProgressHandler() {}
+				appendErrorHandler(
+					handler: (status: number, statusText: string, cleanup: () => void) => void,
+				) {
+					this.errorHandler = handler;
+				}
+				appendAbortHandler() {}
+				getResponseHeader() {
+					return null;
+				}
+				appendLoadHandler() {}
+				send() {
+					attemptCount++;
+					this.errorHandler?.(500, "Internal Server Error", () => {});
+				}
+			},
+		}));
+
+		const { xhrUploadPart } = await import("./upload-part");
+
+		const controller = new AbortController();
+		const request = xhrUploadPart(
+			{
+				presignedUrl: "https://s3.example.com/part-1",
+				partNumber: 1,
+				body: new Blob(["test"]),
+				signal: controller.signal,
+			},
+			{ retry: 3 },
+		);
+
+		expect(attemptCount).toBe(1);
+
+		controller.abort();
+
+		await expect(request).rejects.toThrow("Part upload aborted");
+		expect(attemptCount).toBe(1);
+
+		vi.doUnmock("../../core/resilience/retry");
+		vi.doUnmock("./xhr-factory");
+		vi.resetModules();
+	});
 });

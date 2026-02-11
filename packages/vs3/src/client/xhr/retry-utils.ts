@@ -14,6 +14,8 @@ type ExecuteWithRetriesParams<T> = {
 	execute: () => Promise<T>;
 	unknownErrorMessage: string;
 	noAttemptsMessage: string;
+	signal?: AbortSignal;
+	abortMessage?: string;
 };
 
 export function resolveMaxAttempts(retry?: undefined | true | number): number {
@@ -39,12 +41,49 @@ function normalizeError(
 	return new Error(unknownErrorMessage);
 }
 
+function createAbortError(message: string): DOMException {
+	return new DOMException(message, "AbortError");
+}
+
+async function waitForRetryDelay(
+	delayMs: number,
+	signal: AbortSignal | undefined,
+	abortMessage: string,
+): Promise<void> {
+	if (!signal) {
+		await sleep(delayMs);
+		return;
+	}
+
+	if (signal.aborted) {
+		throw createAbortError(abortMessage);
+	}
+
+	let abortHandler: (() => void) | undefined;
+	const abortPromise = new Promise<never>((_resolve, reject) => {
+		abortHandler = () => {
+			reject(createAbortError(abortMessage));
+		};
+		signal.addEventListener("abort", abortHandler, { once: true });
+	});
+
+	try {
+		await Promise.race([sleep(delayMs), abortPromise]);
+	} finally {
+		if (abortHandler) {
+			signal.removeEventListener("abort", abortHandler);
+		}
+	}
+}
+
 export async function executeWithRetries<T>({
 	maxAttempts,
 	retryConfig,
 	execute,
 	unknownErrorMessage,
 	noAttemptsMessage,
+	signal,
+	abortMessage = "Operation aborted",
 }: ExecuteWithRetriesParams<T>): Promise<T> {
 	let attempt = 0;
 	let lastError: RetryableError | undefined;
@@ -69,7 +108,7 @@ export async function executeWithRetries<T>({
 			}
 
 			const delayMs = calculateRetryDelay(attempt, retryConfig);
-			await sleep(delayMs);
+			await waitForRetryDelay(delayMs, signal, abortMessage);
 		}
 	}
 

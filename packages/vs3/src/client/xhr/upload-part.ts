@@ -69,5 +69,7 @@ export function xhrUploadPart(
 		execute: () => createPartUploadRequest(params),
 		unknownErrorMessage: "Part upload failed with an unknown error",
 		noAttemptsMessage: "Part upload failed: no attempts made",
+		signal: params.signal,
+		abortMessage: "Part upload aborted",
 	});
 }

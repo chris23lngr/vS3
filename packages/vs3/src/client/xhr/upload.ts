@@ -141,5 +141,7 @@ export async function xhrUpload(
 			}),
 		unknownErrorMessage: "Upload failed with an unknown error",
 		noAttemptsMessage: "Upload failed: no attempts made",
+		signal,
+		abortMessage: "Upload aborted",
 	});
 }
