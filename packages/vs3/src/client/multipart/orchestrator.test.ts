@@ -310,7 +310,7 @@ describe("executeMultipartUpload", () => {
 
 	it("uses default partSize and concurrency when not specified", async () => {
 		const $fetch = createMockFetch();
-		// Create a file just over default 10MB to verify default part size
+		// Use a small file to verify default part size/concurrency behavior.
 		const file = createSmallFile(100);
 
 		const result = await executeMultipartUpload({
