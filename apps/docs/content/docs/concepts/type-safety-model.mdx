@@ -51,15 +51,6 @@ export const client = createStorageClient<typeof storage.$Infer>({
 
 Now `upload(file, metadata)` requires metadata that matches your server schema.
 
-## Input vs Output Types
-
-`vs3` tracks metadata as input/output types:
-
-- Input type: what callers provide.
-- Output type: parsed/normalized value after schema validation.
-
-If your schema transforms values, hooks and route internals use the parsed output type, not raw input.
-
 ## Runtime Validation Still Matters
 
 TypeScript types help during development, but all external input is validated at runtime on endpoint boundaries.
