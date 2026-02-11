@@ -136,6 +136,7 @@ async function presignPartsBatch(
 	options: MultipartUploadOptions,
 ): Promise<PresignedPart[]> {
 	const response = await $fetch("/multipart/presign-parts", {
+		signal: options.signal,
 		body: {
 			key,
 			uploadId,
@@ -245,7 +246,10 @@ export async function executeMultipartUpload(
 				metadata,
 			};
 
-	const createResponse = await $fetch("/multipart/create", { body });
+	const createResponse = await $fetch("/multipart/create", {
+		signal: options.signal,
+		body,
+	});
 	if (createResponse.error) {
 		parseFetchError(createResponse.error, "Failed to create multipart upload");
 	}
@@ -312,6 +316,7 @@ export async function executeMultipartUpload(
 			.sort((a, b) => a.partNumber - b.partNumber);
 
 		const completeResponse = await $fetch("/multipart/complete", {
+			signal: options.signal,
 			body: { key, uploadId, parts },
 		});
 

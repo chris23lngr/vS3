@@ -335,6 +335,31 @@ describe("executeMultipartUpload", () => {
 		expect(result.totalParts).toBe(1);
 	});
 
+	it("forwards AbortSignal to create, presign, and complete requests", async () => {
+		const $fetch = createMockFetch();
+		const signal = new AbortController().signal;
+
+		await executeMultipartUpload({
+			$fetch,
+			file: createSmallFile(),
+			metadata: {},
+			options: { partSize: 100, signal },
+		});
+
+		expect($fetch).toHaveBeenCalledWith(
+			"/multipart/create",
+			expect.objectContaining({ signal }),
+		);
+		expect($fetch).toHaveBeenCalledWith(
+			"/multipart/presign-parts",
+			expect.objectContaining({ signal }),
+		);
+		expect($fetch).toHaveBeenCalledWith(
+			"/multipart/complete",
+			expect.objectContaining({ signal }),
+		);
+	});
+
 	it("rejects invalid partSize values", async () => {
 		const $fetch = createMockFetch();
 
