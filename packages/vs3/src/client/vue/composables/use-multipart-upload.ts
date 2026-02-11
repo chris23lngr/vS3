@@ -169,6 +169,7 @@ function useMultipartUploadInternal<T extends InferredTypes>(
 		file: File,
 		metadata: StandardSchemaV1.InferInput<T["metadata"]>,
 	): Promise<void> => {
+		abortController.abort();
 		abortController = new AbortController();
 		await executeMultipartUpload({
 			client,

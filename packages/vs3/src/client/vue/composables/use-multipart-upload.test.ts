@@ -139,4 +139,39 @@ describe("createUseMultipartUpload", () => {
 		expect(state.value.isLoading).toBe(false);
 		expect(state.value.status).toBe("success");
 	});
+
+	it("aborts the previous upload when upload is called again", async () => {
+		const client = createBaseClient({});
+		const signals: AbortSignal[] = [];
+		let callCount = 0;
+
+		client.multipartUpload = vi.fn(async (_file, _metadata, options) => {
+			callCount++;
+			const signal = options?.signal;
+			if (!signal) {
+				throw new Error("missing signal");
+			}
+			signals.push(signal);
+
+			if (callCount === 1) {
+				return new Promise((_resolve, reject) => {
+					signal.addEventListener("abort", () => reject(new Error("aborted")));
+				});
+			}
+
+			return { key: "k2", uploadId: "u2", totalParts: 1 };
+		});
+
+		const useMultipartUpload = createUseMultipartUpload(client);
+		const { upload } = useMultipartUpload();
+
+		const firstUpload = upload(file, {});
+		await upload(file, {});
+		await expect(firstUpload).resolves.toBeUndefined();
+
+		expect(client.multipartUpload).toHaveBeenCalledTimes(2);
+		expect(signals).toHaveLength(2);
+		expect(signals[0]?.aborted).toBe(true);
+		expect(signals[1]?.aborted).toBe(false);
+	});
 });
