@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { StorageErrorCode } from "../../core/error/codes";
 import { executeMultipartUpload } from "./orchestrator";
 
 function createMockFetch() {
@@ -129,7 +130,10 @@ describe("executeMultipartUpload", () => {
 				metadata: {},
 				options: {},
 			}),
-		).rejects.toThrow("Create failed");
+		).rejects.toMatchObject({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			message: "Failed to create multipart upload",
+		});
 	});
 
 	it("aborts upload on presign failure and calls abort endpoint", async () => {
@@ -155,7 +159,10 @@ describe("executeMultipartUpload", () => {
 				metadata: {},
 				options: { partSize: 100 },
 			}),
-		).rejects.toThrow("Presign failed");
+		).rejects.toMatchObject({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			message: "Failed to presign upload parts",
+		});
 
 		expect(abortCalled).toBe(true);
 	});
@@ -194,7 +201,10 @@ describe("executeMultipartUpload", () => {
 				metadata: {},
 				options: { partSize: 100 },
 			}),
-		).rejects.toThrow("Complete failed");
+		).rejects.toMatchObject({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			message: "Failed to complete multipart upload",
+		});
 
 		expect(abortCalled).toBe(true);
 	});
@@ -237,6 +247,134 @@ describe("executeMultipartUpload", () => {
 
 		// With default 10MB part size, a 100-byte file should have 1 part
 		expect(result.totalParts).toBe(1);
+	});
+
+	it("rejects invalid partSize values", async () => {
+		const $fetch = createMockFetch();
+
+		await expect(
+			executeMultipartUpload({
+				$fetch,
+				file: createSmallFile(),
+				metadata: {},
+				options: { partSize: 0 },
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			message: "Invalid multipart partSize.",
+		});
+	});
+
+	it("rejects invalid concurrency values", async () => {
+		const $fetch = createMockFetch();
+
+		await expect(
+			executeMultipartUpload({
+				$fetch,
+				file: createSmallFile(),
+				metadata: {},
+				options: { concurrency: 0 },
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			message: "Invalid multipart concurrency.",
+		});
+	});
+
+	it("rejects empty files for multipart uploads", async () => {
+		const $fetch = createMockFetch();
+
+		await expect(
+			executeMultipartUpload({
+				$fetch,
+				file: createSmallFile(0),
+				metadata: {},
+				options: {},
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.INVALID_FILE_INFO,
+			message: "Multipart upload requires a non-empty file.",
+		});
+	});
+
+	it("preserves typed server errors from create", async () => {
+		const $fetch = vi.fn(async (path: string) => {
+			if (path === "/multipart/create") {
+				return {
+					error: {
+						origin: "server",
+						code: StorageErrorCode.METADATA_VALIDATION_ERROR,
+						message: "Invalid metadata.",
+						details: { field: "userId" },
+						httpStatus: 400,
+					},
+				};
+			}
+			return { data: {} };
+		}) as unknown as ReturnType<typeof import("@better-fetch/fetch").createFetch>;
+
+		await expect(
+			executeMultipartUpload({
+				$fetch,
+				file: createSmallFile(),
+				metadata: {},
+				options: {},
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.METADATA_VALIDATION_ERROR,
+			message: "Invalid metadata.",
+		});
+	});
+
+	it("rejects invalid multipart/create response payloads", async () => {
+		const $fetch = vi.fn(async (path: string) => {
+			if (path === "/multipart/create") {
+				return { data: { uploadId: "", key: "" } };
+			}
+			return { data: {} };
+		}) as unknown as ReturnType<typeof import("@better-fetch/fetch").createFetch>;
+
+		await expect(
+			executeMultipartUpload({
+				$fetch,
+				file: createSmallFile(),
+				metadata: {},
+				options: {},
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			message: "Invalid multipart create response.",
+		});
+	});
+
+	it("rejects invalid multipart/presign-parts response payloads", async () => {
+		let abortCalled = false;
+		const $fetch = vi.fn(async (path: string) => {
+			if (path === "/multipart/create") {
+				return { data: { uploadId: "uid-1", key: "uploads/f.bin" } };
+			}
+			if (path === "/multipart/presign-parts") {
+				return { data: { parts: [{ partNumber: 0, presignedUrl: "" }] } };
+			}
+			if (path === "/multipart/abort") {
+				abortCalled = true;
+				return { data: { success: true } };
+			}
+			return { data: {} };
+		}) as unknown as ReturnType<typeof import("@better-fetch/fetch").createFetch>;
+
+		await expect(
+			executeMultipartUpload({
+				$fetch,
+				file: createSmallFile(),
+				metadata: {},
+				options: {},
+			}),
+		).rejects.toMatchObject({
+			code: StorageErrorCode.UNKNOWN_ERROR,
+			message: "Invalid multipart presign response.",
+		});
+		expect(abortCalled).toBe(true);
 	});
 });
 
