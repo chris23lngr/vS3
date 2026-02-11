@@ -61,7 +61,7 @@ export const routeRegistry = {
 		output: z.object({
 			parts: z.array(
 				z.object({
-					partNumber: z.number(),
+					partNumber: z.number().int().min(1),
 					presignedUrl: z.string(),
 				}),
 			),
