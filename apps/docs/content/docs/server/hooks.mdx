@@ -3,87 +3,54 @@ title: Hooks
 description: Control upload and download behavior with before/after lifecycle hooks.
 ---
 
-`vs3` supports four lifecycle hooks in `createStorage`:
+If you need to perform actions before or after certain events, hooks are the way to go. We currently support the following lifecycle hooks:
 
-- `beforeUpload`
-- `afterUpload`
-- `beforeDownload`
-- `afterDownload`
+- [beforeUpload](#beforeupload)
+- [afterUpload](#afterupload)
+- [beforeDownload](#beforedownload)
+- [afterDownload](#afterdownload)
 
 Use hooks for authorization checks, audit logging, business rules, and side effects.
 
-## Hook Signatures
-
-```ts
-hooks: {
-  beforeUpload?: (fileInfo, metadata) => BeforeHookResult | Promise<BeforeHookResult>;
-  afterUpload?: (fileInfo, metadata, key) => void | Promise<void>;
-  beforeDownload?: (key) => BeforeHookResult | Promise<BeforeHookResult>;
-  afterDownload?: (key) => void | Promise<void>;
-}
-```
-
-`BeforeHookResult`:
-
-```ts
-type BeforeHookResult = {
-  success: boolean;
-  reason?: string;
-};
-```
-
 ## Upload Hooks
 
-### `beforeUpload`
+The following hooks are executed on upload requests.
 
-Runs after request validation and before key generation/presigning.
+### beforeUpload
 
-If `success: false`, request fails with `FORBIDDEN`.
+Runs after request validation and before key generation/presigning. If the result is `{ success: false }`, the request fails with `FORBIDDEN` and won't be processed further.
 
-### `afterUpload`
+### afterUpload
 
-Runs after upload URL creation and resolved key selection.
-
-Use this for logging or async bookkeeping.
+Runs after upload URL creation and resolved key selection. This is a good place to perform async operations like logging or auditing.
 
 ## Download Hooks
 
-### `beforeDownload`
+The following hooks are executed on download requests.
 
-Runs before object existence check and URL generation.
+### beforeDownload
 
-If rejected, request fails with `FORBIDDEN`.
+Runs before object existence check and URL generation. If the result is `{ success: false }`, the request fails with `FORBIDDEN` and won't be processed further.
 
-### `afterDownload`
+### afterDownload
 
-Runs after presigned download URL generation.
+Runs after presigned download URL generation. This is a good place to perform async operations like logging or auditing.
 
-## Full Example
+## Example
+
+In the following exmaple, the upload will only be processed if the user is allowed to upload.
 
 ```ts
 import { createStorage } from "vs3";
 
 const storage = createStorage({
-  bucket: "my-bucket",
-  adapter,
+  // ...
   hooks: {
     beforeUpload: async (fileInfo, metadata) => {
       const allowed = await canUpload(metadata.userId, fileInfo.size);
       return allowed
         ? { success: true }
         : { success: false, reason: "Upload policy denied." };
-    },
-    afterUpload: async (_fileInfo, metadata, key) => {
-      await auditLog("upload-url-issued", { userId: metadata.userId, key });
-    },
-    beforeDownload: async (key) => {
-      const allowed = await canDownload(key);
-      return allowed
-        ? { success: true }
-        : { success: false, reason: "Download policy denied." };
-    },
-    afterDownload: async (key) => {
-      await auditLog("download-url-issued", { key });
     },
   },
 });

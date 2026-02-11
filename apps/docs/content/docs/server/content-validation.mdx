@@ -3,27 +3,14 @@ title: Content Validation
 description: Combine built-in checks and custom validators to enforce upload policies.
 ---
 
-`vs3` validates file uploads in layers:
+Use custom content validators to enforce upload policies. While we provide some built-in checks like filename validity, file size and allowed file types, you can always add your own validators to enforce your own policies.
+
+Files are validated in the following order:
 
 1. Filename validity
 2. File size (`maxFileSize`)
 3. Allowed type/extension (`allowedFileTypes`)
 4. Custom validators (`contentValidators`)
-
-## Built-in File Constraints
-
-Configure standard constraints directly in `createStorage`:
-
-```ts
-const storage = createStorage({
-  bucket: "my-bucket",
-  adapter,
-  maxFileSize: 20 * 1024 * 1024,
-  allowedFileTypes: ["image/*", ".pdf"],
-});
-```
-
-If any check fails, `vs3` returns a typed error (for example `FILE_TOO_LARGE`, `FILE_TYPE_NOT_ALLOWED`, `INVALID_FILENAME`).
 
 ## Custom Validators
 
@@ -52,17 +39,20 @@ contentValidators: [
 
 ## Timeout Control
 
-Use `contentValidatorTimeoutMs` to cap execution time per validator:
+Use `contentValidatorTimeoutMs` to cap execution time per validator. The timeout is applied to all validators in the chain.
 
 ```ts
-contentValidatorTimeoutMs: 5000;
+const storage = createStorage({
+  // ...
+  contentValidatorTimeoutMs: 5000, // 5 seconds
+});
 ```
 
 Timed-out or thrown validator errors are treated as validation failures.
 
 ## Helper Factories
 
-`vs3` also exports reusable validator factories from the main package:
+`vs3` also exports the following reusable validator factories from the main package. These are already implemented in the core package but are exported for convenience.
 
 - `createMaxSizeValidator`
 - `createMinSizeValidator`
@@ -86,6 +76,10 @@ contentValidators: [
   createFilenamePatternValidator(/^[a-z0-9._-]+$/i),
 ];
 ```
+
+<Callout type="warn" title="Validation Order">
+If you pass in a built-in validator factory to the `contentValidators` array, checks will run twice. Once by the factory and once by the core package.
+</Callout>
 
 ## Validation Order Notes
 

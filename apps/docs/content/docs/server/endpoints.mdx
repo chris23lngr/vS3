@@ -3,6 +3,10 @@ title: Endpoints
 description: Overview of the endpoints provided by vS3.
 ---
 
+The following endpoints are provided by the storage instance. Storage endpoints are not directly accessible from the client, but they are used behind the scenes by the client SDKs. 
+
+All endpoints can be called directly from the server using the `storage.api` object.
+
 ## /upload-url
 
 `POST /upload-url` creates a presigned upload URL and returns the resolved object key.
@@ -260,3 +264,9 @@ Response:
 - `MULTIPART_UPLOAD_NOT_FOUND` for expired/missing sessions.
 - `INVALID_PARTS` when completion payload is invalid.
 - `MULTIPART_UPLOAD_FAILED` for provider failures during presign/complete/abort.
+
+## API Reference
+
+<Callout type="error" title="Work in progress">
+  We currently do not provide an API reference for the endpoints. 
+</Callout>
