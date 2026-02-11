@@ -1,0 +1,12 @@
+{
+	"pages": [
+		"overview",
+		"aws",
+		"cloudflare-r2",
+		"minio",
+		"backblaze-b2",
+		"digitalocean-spaces",
+		"wasabi",
+		"custom-adapter"
+	]
+}
