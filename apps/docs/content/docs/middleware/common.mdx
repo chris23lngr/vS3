@@ -12,7 +12,7 @@ We provide a set of common middleware that you can use to secure your storage AP
 
 ## CORS
 
-Use `createCorsMiddleware` to handle preflight requests and provide CORS header data. You can find the implementation [here](https://github.com/chris23lngr/vS3/blob/master/packages/vs3/src/middleware/common/cors.ts).
+Use `createCorsMiddleware` to handle preflight requests and provide CORS header data.
 
 ```ts
 createCorsMiddleware({
@@ -30,9 +30,7 @@ Notes:
 
 ## Rate Limiting
 
-Set up rate limiting with a store and limits. Users wont be able to upload more than `maxRequests` requests per `windowMs`. A store is required to track requests. We provide an in-memory store for this purpose (Redis support is coming soon).
-
-You can find the implementation [here](https://github.com/chris23lngr/vS3/blob/master/packages/vs3/src/middleware/common/rate-limit.ts).
+Set up rate limiting with a store and limits. Users won't be able to exceed `maxRequests` requests per `windowMs`. A store is required to track requests. We provide an in-memory store out of the box. You can implement the `RateLimitStore` interface to use Redis or any other backing store.
 
 ```ts
 const store = createInMemoryRateLimitStore();
@@ -63,13 +61,9 @@ The `x-forwarded-for` header is only trustworthy when the app sits behind a reve
 Configure your proxy to strip or overwrite `x-forwarded-for` before it reaches the application.
 </Callout>
 
-<Callout type="error" title="Behaviour change">
-The behaviour of this middleware will likely change in the near future.
-</Callout>
-
 ## Logging
 
-Logs each incoming request. You can pass in any logger function that receives a log entry object (`{ method, path, timestamp }`). You can find the implementation [here](https://github.com/chris23lngr/vS3/blob/master/packages/vs3/src/middleware/common/logging.ts).
+Logs each incoming request. You can pass in any logger function that receives a log entry object (`{ method, path, timestamp }`).
 
 ```ts
 createLoggingMiddleware({
@@ -81,7 +75,7 @@ createLoggingMiddleware({
 
 ## Timeout
 
-Specify a timeout for requests. If the request takes longer than the specified timeout, it will be rejected with a `TIMEOUT` error. Implementation can be found [here](https://github.com/chris23lngr/vS3/blob/master/packages/vs3/src/middleware/common/timeout.ts).
+Specify a timeout for requests. If the request takes longer than the specified timeout, it will be rejected with a `TIMEOUT` error.
 
 ```ts
 createTimeoutMiddleware({
