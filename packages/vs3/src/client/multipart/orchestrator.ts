@@ -29,7 +29,11 @@ export type MultipartUploadResult = {
 	totalParts: number;
 };
 
-type PresignedPart = { partNumber: number; presignedUrl: string };
+type PresignedPart = {
+	partNumber: number;
+	presignedUrl: string;
+	uploadHeaders?: Record<string, string>;
+};
 
 type OrchestratorParams = {
 	$fetch: ReturnType<typeof createFetch>;
@@ -48,6 +52,7 @@ const presignedPartsResponseSchema = z.object({
 		z.object({
 			partNumber: z.number().int().min(1),
 			presignedUrl: z.string().min(1),
+			uploadHeaders: z.record(z.string(), z.string()).optional(),
 		}),
 	),
 });
@@ -128,12 +133,14 @@ async function presignPartsBatch(
 	key: string,
 	uploadId: string,
 	partNumbers: number[],
+	options: MultipartUploadOptions,
 ): Promise<PresignedPart[]> {
 	const response = await $fetch("/multipart/presign-parts", {
 		body: {
 			key,
 			uploadId,
 			parts: partNumbers.map((partNumber) => ({ partNumber })),
+			...(options.encryption ? { encryption: options.encryption } : {}),
 		},
 	});
 
@@ -188,6 +195,7 @@ async function uploadPartsWithConcurrency(
 					presignedUrl: part.presignedUrl,
 					partNumber: part.partNumber,
 					body: blob,
+					headers: part.uploadHeaders,
 					signal,
 					onProgress: (loaded) => onPartProgress(part.partNumber, loaded),
 				},
@@ -275,7 +283,13 @@ export async function executeMultipartUpload(
 		const allPresignedParts: PresignedPart[] = [];
 		for (let i = 0; i < allPartNumbers.length; i += PRESIGN_BATCH_SIZE) {
 			const batch = allPartNumbers.slice(i, i + PRESIGN_BATCH_SIZE);
-			const presigned = await presignPartsBatch($fetch, key, uploadId, batch);
+			const presigned = await presignPartsBatch(
+				$fetch,
+				key,
+				uploadId,
+				batch,
+				options,
+			);
 			allPresignedParts.push(...presigned);
 		}
 

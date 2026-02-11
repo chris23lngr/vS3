@@ -56,6 +56,7 @@ export const routeRegistry = {
 			key: z.string().min(1),
 			uploadId: z.string().min(1),
 			parts: z.array(z.object({ partNumber: z.number().int().min(1) })),
+			encryption: s3EncryptionSchema.optional(),
 		}),
 		requireMetadata: false,
 		output: z.object({
@@ -63,6 +64,7 @@ export const routeRegistry = {
 				z.object({
 					partNumber: z.number().int().min(1),
 					presignedUrl: z.string(),
+					uploadHeaders: z.record(z.string(), z.string()).optional(),
 				}),
 			),
 		}),

@@ -55,6 +55,66 @@ describe("xhrUploadPart", () => {
 		vi.resetModules();
 	});
 
+	it("applies upload headers to XHR request", async () => {
+		vi.resetModules();
+		let capturedHeaders: Record<string, string> | undefined;
+
+		vi.doMock("./xhr-factory", () => ({
+			XhrFactory: class MockXhrFactory {
+				private loadHandler:
+					| ((
+							success: boolean,
+							status: number,
+							statusText: string,
+							cleanup: () => void,
+					  ) => void)
+					| undefined;
+
+				open() {}
+				appendHeaders(headers?: Record<string, string>) {
+					capturedHeaders = headers;
+				}
+				appendRawProgressHandler() {}
+				appendErrorHandler() {}
+				appendAbortHandler() {}
+				getResponseHeader(name: string) {
+					if (name === "etag") return '"abc-123"';
+					return null;
+				}
+				appendLoadHandler(
+					handler: (
+						success: boolean,
+						status: number,
+						statusText: string,
+						cleanup: () => void,
+					) => void,
+				) {
+					this.loadHandler = handler;
+				}
+				send() {
+					this.loadHandler?.(true, 200, "OK", () => {});
+				}
+			},
+		}));
+
+		const { xhrUploadPart } = await import("./upload-part");
+		const headers = {
+			"x-amz-server-side-encryption-customer-algorithm": "AES256",
+		};
+
+		await xhrUploadPart({
+			presignedUrl: "https://s3.example.com/part-1",
+			partNumber: 1,
+			body: new Blob(["test"]),
+			headers,
+		});
+
+		expect(capturedHeaders).toEqual(headers);
+
+		vi.doUnmock("./xhr-factory");
+		vi.resetModules();
+	});
+
 	it("rejects when ETag header is missing", async () => {
 		vi.resetModules();
 

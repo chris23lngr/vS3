@@ -151,6 +151,44 @@ describe("createS3Operations — multipart", () => {
 			const command = vi.mocked(getSignedUrl).mock.calls.at(-1)?.[1];
 			expect((command as UploadPartCommand).input.Bucket).toBe("custom-bucket");
 		});
+
+		it("returns SSE-C headers and command input when encryption is provided", async () => {
+			const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+			const client = createMockClient();
+			const ops = createS3Operations({ client, resolveBucket });
+
+			const result = await ops.presignUploadPart(
+				{ key: "k", uploadId: "u", partNumber: 1 },
+				{
+					encryption: {
+						type: "SSE-C",
+						customerKey: "dGVzdC1rZXktYmFzZTY0",
+					},
+				},
+			);
+
+			expect(result).toEqual(
+				expect.objectContaining({
+					url: "https://s3.example.com/presigned-part",
+					headers: expect.objectContaining({
+						"x-amz-server-side-encryption-customer-algorithm": "AES256",
+						"x-amz-server-side-encryption-customer-key": "dGVzdC1rZXktYmFzZTY0",
+						"x-amz-server-side-encryption-customer-key-MD5": expect.any(String),
+					}),
+				}),
+			);
+
+			const command = vi.mocked(getSignedUrl).mock.calls.at(-1)?.[1];
+			expect((command as UploadPartCommand).input.SSECustomerAlgorithm).toBe(
+				"AES256",
+			);
+			expect((command as UploadPartCommand).input.SSECustomerKey).toBe(
+				"dGVzdC1rZXktYmFzZTY0",
+			);
+			expect((command as UploadPartCommand).input.SSECustomerKeyMD5).toEqual(
+				expect.any(String),
+			);
+		});
 	});
 
 	describe("completeMultipartUpload", () => {

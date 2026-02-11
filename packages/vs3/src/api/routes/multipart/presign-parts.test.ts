@@ -75,6 +75,80 @@ describe("multipart/presign-parts route", () => {
 		});
 	});
 
+	it("returns uploadHeaders when operations provides them", async () => {
+		const endpoint = createMultipartPresignPartsRoute();
+		const { options, operations } = createContext();
+		(operations.presignUploadPart as ReturnType<typeof vi.fn>).mockResolvedValue({
+			url: "https://s3.example.com/part-1",
+			headers: {
+				"x-amz-server-side-encryption-customer-algorithm": "AES256",
+				"x-amz-server-side-encryption-customer-key": "base64-key",
+				"x-amz-server-side-encryption-customer-key-MD5": "base64-md5",
+			},
+		});
+
+		const result = await callEndpoint(endpoint, {
+			body: {
+				key: "uploads/file.bin",
+				uploadId: "upload-123",
+				parts: [{ partNumber: 1 }],
+			},
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
+		});
+
+		expect(result).toEqual({
+			parts: [
+				{
+					partNumber: 1,
+					presignedUrl: "https://s3.example.com/part-1",
+					uploadHeaders: {
+						"x-amz-server-side-encryption-customer-algorithm": "AES256",
+						"x-amz-server-side-encryption-customer-key": "base64-key",
+						"x-amz-server-side-encryption-customer-key-MD5": "base64-md5",
+					},
+				},
+			],
+		});
+	});
+
+	it("passes encryption options to presignUploadPart", async () => {
+		const endpoint = createMultipartPresignPartsRoute();
+		const { options, operations } = createContext();
+
+		await callEndpoint(endpoint, {
+			body: {
+				key: "uploads/file.bin",
+				uploadId: "upload-123",
+				parts: [{ partNumber: 1 }],
+				encryption: {
+					type: "SSE-C",
+					customerKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+				},
+			},
+			context: {
+				$options: options,
+				$operations: operations,
+			} satisfies Omit<StorageContext, "$middleware">,
+		});
+
+		expect(operations.presignUploadPart).toHaveBeenCalledWith(
+			{
+				key: "uploads/file.bin",
+				uploadId: "upload-123",
+				partNumber: 1,
+			},
+			{
+				encryption: {
+					type: "SSE-C",
+					customerKey: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+				},
+			},
+		);
+	});
+
 	it("throws MULTIPART_UPLOAD_NOT_FOUND for NoSuchUpload by name", async () => {
 		const endpoint = createMultipartPresignPartsRoute();
 		const noSuchUpload = Object.assign(new Error("NoSuchUpload"), {

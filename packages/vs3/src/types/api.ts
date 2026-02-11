@@ -88,8 +88,15 @@ export type StorageAPI<O extends StorageOptions> = {
 			key: string;
 			uploadId: string;
 			parts: { partNumber: number }[];
+			encryption?: S3Encryption;
 		},
-		{ parts: { partNumber: number; presignedUrl: string }[] }
+		{
+			parts: {
+				partNumber: number;
+				presignedUrl: string;
+				uploadHeaders?: Record<string, string>;
+			}[];
+		}
 	>;
 
 	/**

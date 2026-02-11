@@ -233,6 +233,81 @@ describe("executeMultipartUpload", () => {
 		);
 	});
 
+	it("passes encryption to presign-parts and forwards part upload headers", async () => {
+		const $fetch = vi.fn(async (path: string) => {
+			if (path === "/multipart/create") {
+				return { data: { uploadId: "uid-1", key: "uploads/f.bin" } };
+			}
+			if (path === "/multipart/presign-parts") {
+				return {
+					data: {
+						parts: [
+							{
+								partNumber: 1,
+								presignedUrl: "https://s3.example.com/part-1",
+								uploadHeaders: {
+									"x-amz-server-side-encryption-customer-algorithm": "AES256",
+									"x-amz-server-side-encryption-customer-key": "base64-key",
+									"x-amz-server-side-encryption-customer-key-MD5": "base64-md5",
+								},
+							},
+						],
+					},
+				};
+			}
+			if (path === "/multipart/complete") {
+				return { data: { key: "uploads/f.bin" } };
+			}
+			if (path === "/multipart/abort") {
+				return { data: { success: true } };
+			}
+			return { error: { message: "Unexpected path" } };
+		}) as unknown as ReturnType<typeof import("@better-fetch/fetch").createFetch>;
+		const file = createSmallFile(100);
+		const uploadPartModule = await import("../xhr/upload-part");
+		const uploadPartMock = vi.mocked(uploadPartModule.xhrUploadPart);
+		uploadPartMock.mockResolvedValue({
+			partNumber: 1,
+			eTag: '"etag-1"',
+		});
+
+		await executeMultipartUpload({
+			$fetch,
+			file,
+			metadata: {},
+			options: {
+				partSize: 100,
+				encryption: {
+					type: "SSE-C",
+					customerKey: "dGVzdC1rZXktYmFzZTY0",
+				},
+			},
+		});
+
+		expect($fetch).toHaveBeenCalledWith(
+			"/multipart/presign-parts",
+			expect.objectContaining({
+				body: expect.objectContaining({
+					encryption: {
+						type: "SSE-C",
+						customerKey: "dGVzdC1rZXktYmFzZTY0",
+					},
+				}),
+			}),
+		);
+
+		expect(uploadPartMock).toHaveBeenCalledWith(
+			expect.objectContaining({
+				headers: {
+					"x-amz-server-side-encryption-customer-algorithm": "AES256",
+					"x-amz-server-side-encryption-customer-key": "base64-key",
+					"x-amz-server-side-encryption-customer-key-MD5": "base64-md5",
+				},
+			}),
+			expect.any(Object),
+		);
+	});
+
 	it("uses default partSize and concurrency when not specified", async () => {
 		const $fetch = createMockFetch();
 		// Create a file just over default 10MB to verify default part size

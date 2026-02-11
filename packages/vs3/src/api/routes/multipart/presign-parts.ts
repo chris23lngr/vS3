@@ -2,6 +2,7 @@ import z from "zod";
 import { StorageErrorCode } from "../../../core/error/codes";
 import { StorageServerError } from "../../../core/error/error";
 import { getObjectKeyValidationIssue } from "../../../core/validation";
+import type { PresignedUrlResult } from "../../../internal/s3-operations.types";
 import type { StandardSchemaV1 } from "../../../types/standard-schema";
 import { createStorageEndpoint } from "../../create-storage-endpoint";
 import { routeRegistry } from "../../registry";
@@ -11,6 +12,25 @@ function isNoSuchUploadError(error: unknown): boolean {
 	if (typeof error !== "object" || error === null) return false;
 	const err = error as Record<string, unknown>;
 	return err.name === "NoSuchUpload" || err.Code === "NoSuchUpload";
+}
+
+function normalizePresignedPart(
+	partNumber: number,
+	result: PresignedUrlResult,
+): {
+	partNumber: number;
+	presignedUrl: string;
+	uploadHeaders?: Record<string, string>;
+} {
+	if (typeof result === "string") {
+		return { partNumber, presignedUrl: result };
+	}
+
+	return {
+		partNumber,
+		presignedUrl: result.url,
+		uploadHeaders: result.headers,
+	};
 }
 
 export function createMultipartPresignPartsRoute<M extends StandardSchemaV1>(
@@ -31,19 +51,22 @@ export function createMultipartPresignPartsRoute<M extends StandardSchemaV1>(
 			validateContext(ctx);
 
 			const operations = ctx.context.$operations;
-			const { key, uploadId, parts } = ctx.body;
+			const { key, uploadId, parts, encryption } = ctx.body;
 
 			throwIfIssue(getObjectKeyValidationIssue(key));
 
 			try {
 				const presignedParts = await Promise.all(
 					parts.map(async (part) => {
-						const presignedUrl = await operations.presignUploadPart({
+						const input = {
 							key,
 							uploadId,
 							partNumber: part.partNumber,
-						});
-						return { partNumber: part.partNumber, presignedUrl };
+						};
+						const result = encryption
+							? await operations.presignUploadPart(input, { encryption })
+							: await operations.presignUploadPart(input);
+						return normalizePresignedPart(part.partNumber, result);
 					}),
 				);
 

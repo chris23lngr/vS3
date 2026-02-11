@@ -158,14 +158,22 @@ export function createS3Operations(
 		},
 
 		async presignUploadPart(input, requestOptions) {
-			const { expiresIn = 3600, bucket } = requestOptions ?? {};
+			const { expiresIn = 3600, bucket, encryption } = requestOptions ?? {};
+			const encryptionConfig = resolveS3EncryptionConfig(encryption);
 			const command = new UploadPartCommand({
 				Bucket: resolveBucket(bucket),
 				Key: input.key,
 				UploadId: input.uploadId,
 				PartNumber: input.partNumber,
+				...(encryptionConfig.input ?? {}),
 			});
-			return getSignedUrl(client, command, { expiresIn });
+			const url = await getSignedUrl(client, command, { expiresIn });
+
+			if (encryptionConfig.headers) {
+				return { url, headers: encryptionConfig.headers };
+			}
+
+			return url;
 		},
 
 		async completeMultipartUpload(input, requestOptions) {

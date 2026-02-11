@@ -12,6 +12,7 @@ type UploadPartParams = {
 	presignedUrl: string;
 	partNumber: number;
 	body: Blob;
+	headers?: Record<string, string>;
 	signal?: AbortSignal;
 	onProgress?: (loaded: number) => void;
 };
@@ -76,6 +77,7 @@ function createPartUploadRequest(
 	return new Promise((resolve, reject) => {
 		const xhr = new XhrFactory(params.signal);
 		xhr.open("PUT", params.presignedUrl, true);
+		xhr.appendHeaders(params.headers);
 
 		xhr.appendRawProgressHandler(params.onProgress);
 

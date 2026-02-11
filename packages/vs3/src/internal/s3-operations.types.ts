@@ -17,7 +17,11 @@ export type PresignedUploadResult = PresignedUrlResult;
 export type PresignedDownloadResult = PresignedUrlResult;
 
 export type MultipartUploadPart = { partNumber: number; eTag: string };
-export type PresignedPartResult = { partNumber: number; presignedUrl: string };
+export type PresignedPartResult = {
+	partNumber: number;
+	presignedUrl: string;
+	uploadHeaders?: Record<string, string>;
+};
 
 export type PresignUploadPartInput = {
 	key: string;
@@ -77,8 +81,12 @@ export type S3Operations = {
 
 	presignUploadPart(
 		input: PresignUploadPartInput,
-		options?: Partial<{ expiresIn: number; bucket: string }>,
-	): Promise<string>;
+		options?: Partial<{
+			expiresIn: number;
+			bucket: string;
+			encryption: S3Encryption;
+		}>,
+	): Promise<PresignedUrlResult>;
 
 	completeMultipartUpload(
 		input: CompleteMultipartUploadInput,
