@@ -71,8 +71,10 @@ function validateRateLimitConfig(config: RateLimitConfig): void {
 export function resolveClientIp(headers: Headers): string {
 	const forwarded = headers.get("x-forwarded-for");
 	if (forwarded) {
-		const first = forwarded.split(",")[0];
-		return first.trim();
+		const first = forwarded.split(",")[0].trim();
+		if (first) {
+			return first;
+		}
 	}
 	return "unknown";
 }

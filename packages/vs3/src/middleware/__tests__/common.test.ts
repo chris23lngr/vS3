@@ -303,6 +303,16 @@ describe("resolveClientIp", () => {
 		const headers = new Headers();
 		expect(resolveClientIp(headers)).toBe("unknown");
 	});
+
+	it("returns unknown when first entry is empty", () => {
+		const headers = new Headers({ "x-forwarded-for": ", 1.2.3.4" });
+		expect(resolveClientIp(headers)).toBe("unknown");
+	});
+
+	it("returns unknown when header is whitespace only", () => {
+		const headers = new Headers({ "x-forwarded-for": "  " });
+		expect(resolveClientIp(headers)).toBe("unknown");
+	});
 });
 
 // ---------------------------------------------------------------------------
