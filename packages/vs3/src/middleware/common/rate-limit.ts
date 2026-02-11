@@ -1,12 +1,27 @@
 import { StorageErrorCode } from "../../core/error/codes";
 import { StorageServerError } from "../../core/error/error";
 import { createStorageMiddleware } from "../core/create-middleware";
-import type { StorageMiddleware } from "../types";
+import type { StorageMiddleware, StorageMiddlewareContext } from "../types";
 
 /** Store for tracking request counts within time windows. */
 export type RateLimitStore = {
 	readonly increment: (key: string, windowMs: number) => Promise<number>;
 };
+
+/**
+ * Generates a rate-limit bucket key from the request context.
+ *
+ * Built-in helpers: {@link resolveClientIp}, or combine parts with a
+ * custom function.
+ *
+ * **Deployment note – proxy headers:**
+ * `x-forwarded-for` is only trustworthy when the app sits behind a
+ * reverse proxy (nginx, Cloudflare, AWS ALB, etc.) that overwrites the
+ * header. If clients can reach the server directly, they can spoof the
+ * header and bypass rate limits. Configure your proxy to strip or
+ * overwrite `x-forwarded-for` before it reaches the application.
+ */
+export type RateLimitKeyGenerator = (ctx: StorageMiddlewareContext) => string;
 
 /** Configuration for the rate limit middleware. */
 export type RateLimitConfig = {
@@ -15,6 +30,17 @@ export type RateLimitConfig = {
 	readonly store: RateLimitStore;
 	readonly skipPaths?: readonly string[];
 	readonly includePaths?: readonly string[];
+	/**
+	 * Custom function that derives the rate-limit bucket key from the
+	 * request context.
+	 *
+	 * Use {@link resolveClientIp} to incorporate the client IP into a
+	 * custom key — but only when the deployment guarantees that a
+	 * trusted reverse proxy overwrites `x-forwarded-for`.
+	 *
+	 * @default `ctx.path` — global per-path bucket.
+	 */
+	readonly keyGenerator?: RateLimitKeyGenerator;
 };
 
 type RateLimitResult = {
@@ -31,6 +57,26 @@ function validateRateLimitConfig(config: RateLimitConfig): void {
 			"Rate limit middleware requires maxRequests and windowMs to be > 0",
 		);
 	}
+}
+
+/**
+ * Extracts the client IP from the request headers.
+ *
+ * Reads `x-forwarded-for` (first address) and falls back to `"unknown"`.
+ *
+ * **Important:** This value is only trustworthy when the application
+ * runs behind a reverse proxy that overwrites the header. See
+ * {@link RateLimitKeyGenerator} for deployment guidance.
+ */
+export function resolveClientIp(headers: Headers): string {
+	const forwarded = headers.get("x-forwarded-for");
+	if (forwarded) {
+		const first = forwarded.split(",")[0].trim();
+		if (first) {
+			return first;
+		}
+	}
+	return "unknown";
 }
 
 /** Creates an in-memory rate limit store using fixed windows. */
@@ -58,6 +104,8 @@ export function createRateLimitMiddleware(
 	config: RateLimitConfig,
 ): StorageMiddleware<object, RateLimitResult> {
 	validateRateLimitConfig(config);
+	const generateKey = config.keyGenerator ?? ((ctx) => ctx.path);
+
 	return createStorageMiddleware(
 		{
 			name: "rate-limit",
@@ -65,7 +113,8 @@ export function createRateLimitMiddleware(
 			includePaths: config.includePaths,
 		},
 		async (ctx) => {
-			const count = await config.store.increment(ctx.path, config.windowMs);
+			const key = generateKey(ctx);
+			const count = await config.store.increment(key, config.windowMs);
 			const remaining = Math.max(0, config.maxRequests - count);
 
 			if (count > config.maxRequests) {

@@ -6,7 +6,9 @@ import { createLoggingMiddleware, type LogEntry } from "../common/logging";
 import {
 	createInMemoryRateLimitStore,
 	createRateLimitMiddleware,
+	type RateLimitKeyGenerator,
 	type RateLimitStore,
+	resolveClientIp,
 } from "../common/rate-limit";
 import { createTimeoutMiddleware } from "../common/timeout";
 import { executeMiddlewareChain } from "../core/execute-chain";
@@ -274,6 +276,212 @@ describe("createRateLimitMiddleware includePaths", () => {
 		);
 
 		expect(result.context).toEqual({});
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Rate Limit - resolveClientIp
+// ---------------------------------------------------------------------------
+
+describe("resolveClientIp", () => {
+	it("returns first IP from x-forwarded-for", () => {
+		const headers = new Headers({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" });
+		expect(resolveClientIp(headers)).toBe("1.2.3.4");
+	});
+
+	it("returns single IP from x-forwarded-for", () => {
+		const headers = new Headers({ "x-forwarded-for": "10.0.0.1" });
+		expect(resolveClientIp(headers)).toBe("10.0.0.1");
+	});
+
+	it("trims whitespace from IP", () => {
+		const headers = new Headers({ "x-forwarded-for": "  1.2.3.4 , 5.6.7.8" });
+		expect(resolveClientIp(headers)).toBe("1.2.3.4");
+	});
+
+	it("returns unknown when header is missing", () => {
+		const headers = new Headers();
+		expect(resolveClientIp(headers)).toBe("unknown");
+	});
+
+	it("returns unknown when first entry is empty", () => {
+		const headers = new Headers({ "x-forwarded-for": ", 1.2.3.4" });
+		expect(resolveClientIp(headers)).toBe("unknown");
+	});
+
+	it("returns unknown when header is whitespace only", () => {
+		const headers = new Headers({ "x-forwarded-for": "  " });
+		expect(resolveClientIp(headers)).toBe("unknown");
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Rate Limit - Per-IP Isolation (opt-in via keyGenerator)
+// ---------------------------------------------------------------------------
+
+describe("createRateLimitMiddleware per-IP isolation", () => {
+	const ipKeyGenerator: RateLimitKeyGenerator = (ctx) => {
+		const ip = resolveClientIp(ctx.headers);
+		return `${ip}:${ctx.path}`;
+	};
+
+	it("tracks different IPs independently on the same path", async () => {
+		const store = createInMemoryRateLimitStore();
+		const middleware = createRateLimitMiddleware({
+			maxRequests: 1,
+			windowMs: 60_000,
+			store,
+			keyGenerator: ipKeyGenerator,
+		});
+
+		await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				headers: new Headers({ "x-forwarded-for": "1.1.1.1" }),
+			}),
+		);
+
+		const result = await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				headers: new Headers({ "x-forwarded-for": "2.2.2.2" }),
+			}),
+		);
+
+		expect(result.context).toEqual({ rateLimit: { remaining: 0 } });
+	});
+
+	it("blocks same IP after limit on the same path", async () => {
+		const store = createInMemoryRateLimitStore();
+		const middleware = createRateLimitMiddleware({
+			maxRequests: 1,
+			windowMs: 60_000,
+			store,
+			keyGenerator: ipKeyGenerator,
+		});
+
+		await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				headers: new Headers({ "x-forwarded-for": "1.1.1.1" }),
+			}),
+		);
+
+		try {
+			await executeMiddlewareChain(
+				[middleware],
+				createTestContext({
+					headers: new Headers({ "x-forwarded-for": "1.1.1.1" }),
+				}),
+			);
+			expect.fail("Should have thrown");
+		} catch (error) {
+			assertIsStorageServerError(error);
+			expect(error.code).toBe(StorageErrorCode.RATE_LIMIT_EXCEEDED);
+		}
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Rate Limit - Custom Key Generator
+// ---------------------------------------------------------------------------
+
+describe("createRateLimitMiddleware custom keyGenerator", () => {
+	it("uses custom keyGenerator for bucket isolation", async () => {
+		const store = createInMemoryRateLimitStore();
+		const keyGenerator: RateLimitKeyGenerator = (ctx) => {
+			const userId = ctx.headers.get("x-user-id") ?? "anonymous";
+			return `user:${userId}:${ctx.path}`;
+		};
+
+		const middleware = createRateLimitMiddleware({
+			maxRequests: 1,
+			windowMs: 60_000,
+			store,
+			keyGenerator,
+		});
+
+		await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				headers: new Headers({ "x-user-id": "user-a" }),
+			}),
+		);
+
+		const result = await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				headers: new Headers({ "x-user-id": "user-b" }),
+			}),
+		);
+
+		expect(result.context).toEqual({ rateLimit: { remaining: 0 } });
+	});
+
+	it("blocks same user after limit", async () => {
+		const store = createInMemoryRateLimitStore();
+		const keyGenerator: RateLimitKeyGenerator = (ctx) => {
+			const userId = ctx.headers.get("x-user-id") ?? "anonymous";
+			return `user:${userId}:${ctx.path}`;
+		};
+
+		const middleware = createRateLimitMiddleware({
+			maxRequests: 1,
+			windowMs: 60_000,
+			store,
+			keyGenerator,
+		});
+
+		await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				headers: new Headers({ "x-user-id": "user-a" }),
+			}),
+		);
+
+		try {
+			await executeMiddlewareChain(
+				[middleware],
+				createTestContext({
+					headers: new Headers({ "x-user-id": "user-a" }),
+				}),
+			);
+			expect.fail("Should have thrown");
+		} catch (error) {
+			assertIsStorageServerError(error);
+			expect(error.code).toBe(StorageErrorCode.RATE_LIMIT_EXCEEDED);
+		}
+	});
+
+	it("default key uses path-scoped global bucket", async () => {
+		const store = createInMemoryRateLimitStore();
+		const middleware = createRateLimitMiddleware({
+			maxRequests: 1,
+			windowMs: 60_000,
+			store,
+		});
+
+		await executeMiddlewareChain(
+			[middleware],
+			createTestContext({
+				path: "/shared",
+				headers: new Headers({ "x-forwarded-for": "1.1.1.1" }),
+			}),
+		);
+
+		try {
+			await executeMiddlewareChain(
+				[middleware],
+				createTestContext({
+					path: "/shared",
+					headers: new Headers({ "x-forwarded-for": "2.2.2.2" }),
+				}),
+			);
+			expect.fail("Should have thrown");
+		} catch (error) {
+			assertIsStorageServerError(error);
+			expect(error.code).toBe(StorageErrorCode.RATE_LIMIT_EXCEEDED);
+		}
 	});
 });
 

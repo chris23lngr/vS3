@@ -21,7 +21,9 @@ export {
 	type LogFn,
 	type LoggingConfig,
 	type RateLimitConfig,
+	type RateLimitKeyGenerator,
 	type RateLimitStore,
+	resolveClientIp,
 	type TimeoutConfig,
 } from "./common";
 export { createStorageMiddleware, executeMiddlewareChain } from "./core";
