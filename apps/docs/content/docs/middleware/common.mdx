@@ -75,7 +75,7 @@ createLoggingMiddleware({
 
 ## Timeout
 
-Specify a timeout for requests. If the request takes longer than the specified timeout, it will be rejected with a `TIMEOUT` error.
+Specify a timeout for requests. This middleware adds an `AbortSignal` that is aborted after the configured timeout so endpoint logic can cancel long-running operations.
 
 ```ts
 createTimeoutMiddleware({

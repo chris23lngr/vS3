@@ -3,7 +3,7 @@ title: createStorage
 description: Build a storage instance with typed endpoints and a framework-agnostic request handler.
 ---
 
-`createStorage` is the server entrypoint of `vS3`. It validates your options, builds endpoint context, and returns:
+`createStorage` is the server entrypoint of `vs3`. It validates your options, builds endpoint context, and returns:
 
 - `api`: typed server-side endpoint callers (`uploadUrl`, `downloadUrl`, multipart endpoints).
 - `handler`: Web `Request -> Response` handler for framework routing.
@@ -71,7 +71,7 @@ export const client = createStorageClient<typeof storage.$Infer>({});
 
 ## What createStorage Validates
 
-At initialization, `createStorage` validates key options (for example bucket, file constraints, and middleware configuration) before serving requests.
+At initialization, `createStorage` validates option formats such as `maxFileSize` and `allowedFileTypes`.
 
 At runtime, endpoint boundaries still validate request input and metadata.
 
