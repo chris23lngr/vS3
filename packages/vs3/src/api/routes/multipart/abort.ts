@@ -33,6 +33,9 @@ export function createMultipartAbortRoute<M extends StandardSchemaV1>(
 				await operations.abortMultipartUpload(key, uploadId);
 				return { success: true as const };
 			} catch (error) {
+				if (error instanceof StorageServerError) {
+					throw error;
+				}
 				throw new StorageServerError({
 					code: StorageErrorCode.MULTIPART_UPLOAD_FAILED,
 					message: "Failed to abort multipart upload.",

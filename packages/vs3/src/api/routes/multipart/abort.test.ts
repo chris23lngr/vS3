@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import z from "zod";
 import { StorageErrorCode } from "../../../core/error/codes";
+import { StorageServerError } from "../../../core/error/error";
 import type { S3Operations } from "../../../internal/s3-operations.types";
 import type { Adapter } from "../../../types/adapter";
 import type { StorageContext } from "../../../types/context";
@@ -88,6 +89,32 @@ describe("multipart/abort route", () => {
 				error: "S3 abort error",
 			}),
 		});
+	});
+
+	it("re-throws StorageServerError without wrapping", async () => {
+		const endpoint = createMultipartAbortRoute();
+		const { options, operations } = createContext();
+		const existingError = new StorageServerError({
+			code: StorageErrorCode.MULTIPART_UPLOAD_NOT_FOUND,
+			message: "Multipart upload not found or expired.",
+			details: { key: "uploads/file.bin", uploadId: "upload-123" },
+		});
+		(
+			operations.abortMultipartUpload as ReturnType<typeof vi.fn>
+		).mockRejectedValue(existingError);
+
+		await expect(
+			callEndpoint(endpoint, {
+				body: {
+					key: "uploads/file.bin",
+					uploadId: "upload-123",
+				},
+				context: {
+					$options: options,
+					$operations: operations,
+				} satisfies Omit<StorageContext, "$middleware">,
+			}),
+		).rejects.toBe(existingError);
 	});
 
 	it("rejects invalid object key", async () => {
