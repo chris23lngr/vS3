@@ -1,0 +1,94 @@
+---
+title: Content Validation
+description: Combine built-in checks and custom validators to enforce upload policies.
+---
+
+`vs3` validates file uploads in layers:
+
+1. Filename validity
+2. File size (`maxFileSize`)
+3. Allowed type/extension (`allowedFileTypes`)
+4. Custom validators (`contentValidators`)
+
+## Built-in File Constraints
+
+Configure standard constraints directly in `createStorage`:
+
+```ts
+const storage = createStorage({
+  bucket: "my-bucket",
+  adapter,
+  maxFileSize: 20 * 1024 * 1024,
+  allowedFileTypes: ["image/*", ".pdf"],
+});
+```
+
+If any check fails, `vs3` returns a typed error (for example `FILE_TOO_LARGE`, `FILE_TYPE_NOT_ALLOWED`, `INVALID_FILENAME`).
+
+## Custom Validators
+
+Custom validators run sequentially after built-in validation.
+
+```ts
+contentValidators: [
+  (ctx) => {
+    if (ctx.fileInfo.name.endsWith(".tmp")) {
+      return { valid: false, reason: "Temporary files are not accepted." };
+    }
+    return { valid: true };
+  },
+  {
+    name: "quota-check",
+    validate: async (ctx) => {
+      const remaining = await getRemainingBytes(ctx.metadata.userId);
+      if (ctx.fileInfo.size > remaining) {
+        return { valid: false, reason: "Insufficient quota." };
+      }
+      return { valid: true };
+    },
+  },
+];
+```
+
+## Timeout Control
+
+Use `contentValidatorTimeoutMs` to cap execution time per validator:
+
+```ts
+contentValidatorTimeoutMs: 5000;
+```
+
+Timed-out or thrown validator errors are treated as validation failures.
+
+## Helper Factories
+
+`vs3` also exports reusable validator factories from the main package:
+
+- `createMaxSizeValidator`
+- `createMinSizeValidator`
+- `createContentTypeValidator`
+- `createExtensionValidator`
+- `createFilenamePatternValidator`
+- `createValidator`
+- `combineValidators`
+- `runContentValidators`
+
+Example:
+
+```ts
+import {
+  createContentTypeValidator,
+  createFilenamePatternValidator,
+} from "vs3";
+
+contentValidators: [
+  createContentTypeValidator(["image/png", "image/jpeg"]),
+  createFilenamePatternValidator(/^[a-z0-9._-]+$/i),
+];
+```
+
+## Validation Order Notes
+
+- `beforeUpload` runs after metadata/content validation.
+- Failed validation stops request processing before presigned URL generation.
+- The same validation pipeline applies to single-part and multipart-create requests.

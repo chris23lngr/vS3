@@ -1,0 +1,97 @@
+---
+title: Hooks
+description: Control upload and download behavior with before/after lifecycle hooks.
+---
+
+`vs3` supports four lifecycle hooks in `createStorage`:
+
+- `beforeUpload`
+- `afterUpload`
+- `beforeDownload`
+- `afterDownload`
+
+Use hooks for authorization checks, audit logging, business rules, and side effects.
+
+## Hook Signatures
+
+```ts
+hooks: {
+  beforeUpload?: (fileInfo, metadata) => BeforeHookResult | Promise<BeforeHookResult>;
+  afterUpload?: (fileInfo, metadata, key) => void | Promise<void>;
+  beforeDownload?: (key) => BeforeHookResult | Promise<BeforeHookResult>;
+  afterDownload?: (key) => void | Promise<void>;
+}
+```
+
+`BeforeHookResult`:
+
+```ts
+type BeforeHookResult = {
+  success: boolean;
+  reason?: string;
+};
+```
+
+## Upload Hooks
+
+### `beforeUpload`
+
+Runs after request validation and before key generation/presigning.
+
+If `success: false`, request fails with `FORBIDDEN`.
+
+### `afterUpload`
+
+Runs after upload URL creation and resolved key selection.
+
+Use this for logging or async bookkeeping.
+
+## Download Hooks
+
+### `beforeDownload`
+
+Runs before object existence check and URL generation.
+
+If rejected, request fails with `FORBIDDEN`.
+
+### `afterDownload`
+
+Runs after presigned download URL generation.
+
+## Full Example
+
+```ts
+import { createStorage } from "vs3";
+
+const storage = createStorage({
+  bucket: "my-bucket",
+  adapter,
+  hooks: {
+    beforeUpload: async (fileInfo, metadata) => {
+      const allowed = await canUpload(metadata.userId, fileInfo.size);
+      return allowed
+        ? { success: true }
+        : { success: false, reason: "Upload policy denied." };
+    },
+    afterUpload: async (_fileInfo, metadata, key) => {
+      await auditLog("upload-url-issued", { userId: metadata.userId, key });
+    },
+    beforeDownload: async (key) => {
+      const allowed = await canDownload(key);
+      return allowed
+        ? { success: true }
+        : { success: false, reason: "Download policy denied." };
+    },
+    afterDownload: async (key) => {
+      await auditLog("download-url-issued", { key });
+    },
+  },
+});
+```
+
+## Best Practices
+
+1. Keep hooks fast and deterministic.
+2. Return explicit failure reasons for easier debugging.
+3. Avoid long-running side effects in request path.
+4. Put authentication in middleware and use hooks for storage-specific policy.

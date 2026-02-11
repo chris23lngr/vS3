@@ -1,0 +1,80 @@
+---
+title: createStorage
+description: Build a storage instance with typed endpoints and a framework-agnostic request handler.
+---
+
+`createStorage` is the server entrypoint of `vS3`. It validates your options, builds endpoint context, and returns:
+
+- `api`: typed server-side endpoint callers (`uploadUrl`, `downloadUrl`, multipart endpoints).
+- `handler`: Web `Request -> Response` handler for framework routing.
+- `$Infer`: inferred metadata types for client setup.
+
+## Basic Setup
+
+```ts
+import { S3Client } from "@aws-sdk/client-s3";
+import { aws, createStorage } from "vs3";
+import { z } from "zod";
+
+export const storage = createStorage({
+  bucket: "my-bucket",
+  adapter: aws({
+    bucket: "my-bucket",
+    client: new S3Client({ region: "us-east-1" }),
+  }),
+  metadataSchema: z.object({
+    userId: z.string(),
+  }),
+});
+```
+
+## Returned API
+
+`storage.api` returns the following endpoints:
+
+- `uploadUrl`
+- `downloadUrl`
+- `multipartCreate`
+- `multipartPresignParts`
+- `multipartComplete`
+- `multipartAbort`
+
+These can be used on the server like this:
+
+```ts
+const upload = await storage.api.uploadUrl({
+  body: {
+    fileInfo: { name: "avatar.png", size: 1234, contentType: "image/png" },
+    metadata: { userId: "u_1" },
+  },
+});
+```
+
+For more information on the endpoints, see [Endpoints](/docs/server/endpoints).
+
+## Sharing Types with Client
+
+Use `storage.$Infer` from your storage instance to keep server and client contracts synchronized:
+
+```ts
+import { createStorageClient } from "vs3/vue";
+import type { storage } from "@/server/storage";
+
+export const client = createStorageClient<typeof storage.$Infer>({});
+```
+
+<Callout type="warn">
+    Use a type-only import to avoid bringing server code into browser bundles.
+</Callout>
+
+## What createStorage Validates
+
+At initialization, `createStorage` validates key options (for example bucket, file constraints, and middleware configuration) before serving requests.
+
+At runtime, endpoint boundaries still validate request input and metadata.
+
+## Next Steps
+
+- [Storage Options](/docs/server/storage-options) for full configuration.
+- [Endpoints](/docs/server/endpoints/upload-url) for request/response contracts.
+- [Metadata Schemas](/docs/server/metadata-schemas) for schema behavior.
