@@ -535,16 +535,17 @@ export function createBaseClient<
 		},
 
 		/**
-		 * Gets a presigned download URL for a file in storage.
+		 * Uploads a file to storage using multipart upload.
 		 *
-		 * @param key - The key/path of the file to download
-		 * @param options - Download options including callbacks and encryption
-		 * @returns Download result containing the presigned URL and optional headers
+		 * @param file - The file to upload
+		 * @param metadata - Metadata to associate with the file
+		 * @param options - Multipart options including callbacks and transfer settings
+		 * @returns Multipart upload result containing key and upload metadata
 		 *
 		 * @example
 		 * ```typescript
-		 * const result = await client.downloadFile("uploads/photo.png");
-		 * window.location.href = result.presignedUrl;
+		 * const result = await client.multipartUpload(file, { userId: "123" });
+		 * console.log("Uploaded to:", result.key);
 		 * ```
 		 */
 		multipartUpload: async (
@@ -579,6 +580,19 @@ export function createBaseClient<
 			}
 		},
 
+		/**
+		 * Gets a presigned download URL for a file in storage.
+		 *
+		 * @param key - The key/path of the file to download
+		 * @param options - Download options including callbacks and encryption
+		 * @returns Download result containing the presigned URL and optional headers
+		 *
+		 * @example
+		 * ```typescript
+		 * const result = await client.downloadFile("uploads/photo.png");
+		 * window.location.href = result.presignedUrl;
+		 * ```
+		 */
 		downloadFile: async (
 			key: string,
 			options?: Partial<{
