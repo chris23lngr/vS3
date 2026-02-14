@@ -1,5 +1,15 @@
 # vs3
 
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- [#95](https://github.com/chris23lngr/vS3/pull/95) [`b80706e`](https://github.com/chris23lngr/vS3/commit/b80706e19e7a558db53bba3d5fa29ec6081aa3db) Thanks [@chris23lngr](https://github.com/chris23lngr)! - enables pre and post upload hooks
+
+### Patch Changes
+
+- [#93](https://github.com/chris23lngr/vS3/pull/93) [`6a3975d`](https://github.com/chris23lngr/vS3/commit/6a3975d198c84babb7e7bd1e1726c70f0e38a911) Thanks [@chris23lngr](https://github.com/chris23lngr)! - custom key generator for rate limit middleware
+
 ## 0.1.0-beta.3
 
 ### Minor Changes
